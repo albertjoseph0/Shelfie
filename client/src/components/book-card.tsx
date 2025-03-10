@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash } from "lucide-react";
 import type { Book } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 
@@ -30,6 +30,10 @@ export default function BookCard({
         bookId: book.id,
         addedAt: new Date().toISOString()
       });
+
+      // Invalidate library query to trigger a refresh
+      await queryClient.invalidateQueries({ queryKey: ["/api/library/1"] });
+
       onAddToLibrary?.();
       toast({
         title: "Success",
@@ -50,6 +54,10 @@ export default function BookCard({
     try {
       setIsLoading(true);
       await apiRequest("DELETE", `/api/library/1/${book.id}`);
+
+      // Invalidate library query to trigger a refresh
+      await queryClient.invalidateQueries({ queryKey: ["/api/library/1"] });
+
       onRemoveFromLibrary?.();
       toast({
         title: "Success",

@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Upload, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface UploadDialogProps {
   onSuccess: (books: any[]) => void;
@@ -36,6 +36,9 @@ export default function UploadDialog({ onSuccess }: UploadDialogProps) {
       const imageData = base64.split(",")[1];
       const response = await apiRequest("POST", "/api/analyze", { image: imageData });
       const data = await response.json();
+
+      // Invalidate books query to trigger a refresh
+      await queryClient.invalidateQueries({ queryKey: ["/api/books"] });
 
       onSuccess(data.books);
       setIsOpen(false);
