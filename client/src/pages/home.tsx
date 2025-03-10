@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import UploadDialog from "@/components/upload-dialog";
 import BookGrid from "@/components/book-grid";
 import { Input } from "@/components/ui/input";
-import { Book } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Book, Download } from "lucide-react";
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -20,6 +21,10 @@ export default function Home() {
       )
     : books;
 
+  const handleExport = () => {
+    window.location.href = '/api/export';
+  };
+
   return (
     <div className="space-y-8">
       <div className="text-center space-y-4">
@@ -30,11 +35,19 @@ export default function Home() {
           Catalog your physical book collection with ease. Simply upload a photo of
           your bookshelf and let AI do the work for you.
         </p>
-        <UploadDialog
-          onSuccess={() => {
-            // Query will automatically refresh
-          }}
-        />
+        <div className="flex justify-center gap-4">
+          <UploadDialog
+            onSuccess={() => {
+              // Query will automatically refresh
+            }}
+          />
+          {books.length > 0 && (
+            <Button variant="outline" onClick={handleExport} size="lg" className="gap-2">
+              <Download className="h-5 w-5" />
+              Export Library
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-4 max-w-md mx-auto">

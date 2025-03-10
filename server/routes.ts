@@ -20,6 +20,50 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // Export library as CSV
+  app.get("/api/export", async (_req, res) => {
+    try {
+      const books = await storage.getBooks();
+
+      // Create CSV header
+      const csvRows = [
+        [
+          "Title",
+          "Author",
+          "ISBN",
+          "Added Date",
+          "Publisher",
+          "Published Date",
+          "Categories",
+          "Page Count",
+          "Description"
+        ].join(",")
+      ];
+
+      // Add book data
+      for (const book of books) {
+        const row = [
+          `"${book.title.replace(/"/g, '""')}"`,
+          `"${book.author.replace(/"/g, '""')}"`,
+          `"${book.isbn || ''}"`,
+          `"${new Date(book.createdAt).toLocaleDateString()}"`,
+          `"${book.metadata?.publisher || ''}"`,
+          `"${book.metadata?.publishedDate || ''}"`,
+          `"${book.metadata?.categories?.join('; ') || ''}"`,
+          `"${book.pageCount || ''}"`,
+          `"${(book.description || '').replace(/"/g, '""')}"`
+        ].join(",");
+        csvRows.push(row);
+      }
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=my-library.csv');
+      res.send(csvRows.join("\n"));
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Book analysis and creation with automatic library addition
   app.post("/api/analyze", async (req, res) => {
     try {
