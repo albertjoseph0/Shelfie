@@ -12,14 +12,6 @@ export default function Navbar() {
               <span className="font-merriweather text-xl font-bold">Shelfie</span>
             </a>
           </Link>
-          <div className="flex space-x-4">
-            <Link href="/">
-              <a className="text-foreground hover:text-primary">Home</a>
-            </Link>
-            <Link href="/library">
-              <a className="text-foreground hover:text-primary">My Library</a>
-            </Link>
-          </div>
         </div>
       </div>
     </nav>

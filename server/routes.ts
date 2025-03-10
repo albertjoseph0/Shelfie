@@ -3,13 +3,17 @@ import { createServer } from "http";
 import { storage } from "./storage";
 import { analyzeBookshelfImage } from "./services/openai";
 import { searchBook, getBookById } from "./services/google-books";
-import { insertBookSchema, insertLibrarySchema } from "@shared/schema";
+import { insertBookSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express) {
-  // Get all books
+  // Get all books sorted by creation time (newest first)
   app.get("/api/books", async (_req, res) => {
     try {
       const books = await storage.getBooks();
+      // Sort books by createdAt in descending order (newest first)
+      books.sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
       res.json(books);
     } catch (error) {
       res.status(500).json({ message: error.message });
@@ -39,6 +43,7 @@ export async function registerRoutes(app: Express) {
             description: bookInfo.description,
             pageCount: bookInfo.pageCount,
             googleBooksId: googleBooks[0].id,
+            createdAt: new Date().toISOString(),
             metadata: {
               categories: bookInfo.categories,
               publishedDate: bookInfo.publishedDate,
@@ -53,15 +58,6 @@ export async function registerRoutes(app: Express) {
           }
 
           const savedBook = await storage.createBook(parsed.data);
-
-          // Automatically add to library
-          await storage.addToLibrary({
-            userId: 1, // Hardcoded for demo
-            bookId: savedBook.id,
-            addedAt: new Date().toISOString(),
-            shelfName: 'Default'
-          });
-
           console.log("Saved book:", savedBook);
           return savedBook;
         })

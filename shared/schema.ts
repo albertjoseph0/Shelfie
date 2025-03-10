@@ -11,11 +11,16 @@ export const books = pgTable("books", {
   description: text("description"),
   pageCount: integer("page_count"),
   googleBooksId: text("google_books_id"),
+  createdAt: text("created_at").notNull(),
   metadata: jsonb("metadata").$type<{
     categories?: string[];
     publishedDate?: string;
     publisher?: string;
   }>(),
+});
+
+export const insertBookSchema = createInsertSchema(books).omit({ 
+  id: true 
 });
 
 export const libraries = pgTable("libraries", {
@@ -24,10 +29,6 @@ export const libraries = pgTable("libraries", {
   bookId: integer("book_id").notNull(),
   shelfName: text("shelf_name").default("Default"),
   addedAt: text("added_at").notNull(),
-});
-
-export const insertBookSchema = createInsertSchema(books).omit({ 
-  id: true 
 });
 
 export const insertLibrarySchema = createInsertSchema(libraries).omit({ 
