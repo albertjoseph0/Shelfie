@@ -16,7 +16,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Book analysis and creation
+  // Book analysis and creation with automatic library addition
   app.post("/api/analyze", async (req, res) => {
     try {
       const { image } = req.body;
@@ -53,6 +53,15 @@ export async function registerRoutes(app: Express) {
           }
 
           const savedBook = await storage.createBook(parsed.data);
+
+          // Automatically add to library
+          await storage.addToLibrary({
+            userId: 1, // Hardcoded for demo
+            bookId: savedBook.id,
+            addedAt: new Date().toISOString(),
+            shelfName: 'Default'
+          });
+
           console.log("Saved book:", savedBook);
           return savedBook;
         })
@@ -67,37 +76,16 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Library management
-  app.post("/api/library", async (req, res) => {
+  // Get detailed book info
+  app.get("/api/books/:id/details", async (req, res) => {
     try {
-      const parsed = insertLibrarySchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid library entry data" });
+      const book = await storage.getBook(parseInt(req.params.id));
+      if (!book?.googleBooksId) {
+        return res.status(404).json({ message: "Book not found" });
       }
 
-      const entry = await storage.addToLibrary(parsed.data);
-      res.json(entry);
-    } catch (error) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.get("/api/library/:userId", async (req, res) => {
-    try {
-      const userId = parseInt(req.params.userId);
-      const library = await storage.getLibrary(userId);
-      res.json(library);
-    } catch (error) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.delete("/api/library/:userId/:bookId", async (req, res) => {
-    try {
-      const userId = parseInt(req.params.userId);
-      const bookId = parseInt(req.params.bookId);
-      await storage.removeFromLibrary(userId, bookId);
-      res.status(204).send();
+      const details = await getBookById(book.googleBooksId);
+      res.json(details);
     } catch (error) {
       res.status(500).json({ message: error.message });
     }

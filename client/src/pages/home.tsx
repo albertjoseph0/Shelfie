@@ -7,16 +7,10 @@ import { Book } from "lucide-react";
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   const { data: books = [] } = useQuery({
     queryKey: ["/api/books"],
   });
-
-  const { data: library = [] } = useQuery({
-    queryKey: ["/api/library/1"],
-  });
-
-  const libraryBookIds = new Set(library.map((entry) => entry.bookId));
 
   const filteredBooks = searchQuery
     ? books.filter(
@@ -52,13 +46,7 @@ export default function Home() {
       </div>
 
       {filteredBooks.length > 0 ? (
-        <BookGrid
-          books={filteredBooks}
-          libraryBooks={libraryBookIds}
-          onLibraryChange={() => {
-            // Library query will automatically refresh
-          }}
-        />
+        <BookGrid books={filteredBooks} />
       ) : (
         <div className="text-center py-12">
           <Book className="h-12 w-12 mx-auto text-muted-foreground" />

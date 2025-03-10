@@ -1,114 +1,108 @@
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Plus, Trash } from "lucide-react";
-import type { Book } from "@shared/schema";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Book as BookIcon, Calendar, Building2, Hash } from "lucide-react";
+import type { Book } from "@shared/schema";
+import { useQuery } from "@tanstack/react-query";
 
 interface BookCardProps {
   book: Book;
-  inLibrary?: boolean;
-  onAddToLibrary?: () => void;
-  onRemoveFromLibrary?: () => void;
 }
 
-export default function BookCard({
-  book,
-  inLibrary,
-  onAddToLibrary,
-  onRemoveFromLibrary
-}: BookCardProps) {
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+export default function BookCard({ book }: BookCardProps) {
+  const [showDetails, setShowDetails] = useState(false);
 
-  const handleAddToLibrary = async () => {
-    try {
-      setIsLoading(true);
-      await apiRequest("POST", "/api/library", {
-        userId: 1, // Hardcoded for demo
-        bookId: book.id,
-        addedAt: new Date().toISOString()
-      });
-
-      // Invalidate library query to trigger a refresh
-      await queryClient.invalidateQueries({ queryKey: ["/api/library/1"] });
-
-      onAddToLibrary?.();
-      toast({
-        title: "Success",
-        description: "Book added to your library"
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add book to library",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleRemoveFromLibrary = async () => {
-    try {
-      setIsLoading(true);
-      await apiRequest("DELETE", `/api/library/1/${book.id}`);
-
-      // Invalidate library query to trigger a refresh
-      await queryClient.invalidateQueries({ queryKey: ["/api/library/1"] });
-
-      onRemoveFromLibrary?.();
-      toast({
-        title: "Success",
-        description: "Book removed from your library"
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to remove book from library",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { data: details, isLoading } = useQuery({
+    queryKey: [`/api/books/${book.id}/details`],
+    enabled: showDetails,
+  });
 
   return (
-    <Card className="h-full">
-      <CardHeader className="p-0">
-        <img
-          src={book.coverUrl || "https://via.placeholder.com/200x300"}
-          alt={book.title}
-          className="h-48 w-full object-cover rounded-t-lg"
-        />
-      </CardHeader>
-      <CardContent className="p-4">
-        <h3 className="font-merriweather text-lg font-semibold line-clamp-2">
-          {book.title}
-        </h3>
-        <p className="text-sm text-muted-foreground mb-2">{book.author}</p>
-        <p className="text-sm line-clamp-3 mb-4">{book.description}</p>
-        <Button
-          variant={inLibrary ? "destructive" : "default"}
-          size="sm"
-          className="w-full"
-          onClick={inLibrary ? handleRemoveFromLibrary : handleAddToLibrary}
-          disabled={isLoading}
-        >
-          {inLibrary ? (
-            <>
-              <Trash className="h-4 w-4 mr-2" />
-              Remove
-            </>
-          ) : (
-            <>
-              <Plus className="h-4 w-4 mr-2" />
-              Add to Library
-            </>
-          )}
-        </Button>
-      </CardContent>
-    </Card>
+    <>
+      <Card 
+        className="h-full cursor-pointer transition-transform hover:scale-105"
+        onClick={() => setShowDetails(true)}
+      >
+        <CardHeader className="p-0">
+          <img
+            src={book.coverUrl || "https://via.placeholder.com/200x300"}
+            alt={book.title}
+            className="h-48 w-full object-cover rounded-t-lg"
+          />
+        </CardHeader>
+        <CardContent className="p-4">
+          <h3 className="font-merriweather text-lg font-semibold line-clamp-2">
+            {book.title}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-2">{book.author}</p>
+          <p className="text-sm line-clamp-3">{book.description}</p>
+        </CardContent>
+      </Card>
+
+      <Dialog open={showDetails} onOpenChange={setShowDetails}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{book.title}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="flex gap-4">
+              <img
+                src={book.coverUrl || "https://via.placeholder.com/200x300"}
+                alt={book.title}
+                className="w-32 h-48 object-cover rounded-lg"
+              />
+              <div>
+                <h4 className="font-semibold mb-2">{book.author}</h4>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  {book.metadata?.publisher && (
+                    <p className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      {book.metadata.publisher}
+                    </p>
+                  )}
+                  {book.metadata?.publishedDate && (
+                    <p className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      {book.metadata.publishedDate}
+                    </p>
+                  )}
+                  {book.isbn && (
+                    <p className="flex items-center gap-2">
+                      <Hash className="h-4 w-4" />
+                      ISBN: {book.isbn}
+                    </p>
+                  )}
+                  {book.pageCount && (
+                    <p className="flex items-center gap-2">
+                      <BookIcon className="h-4 w-4" />
+                      {book.pageCount} pages
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <p className="text-sm">{book.description}</p>
+            {book.metadata?.categories && (
+              <div className="flex gap-2 flex-wrap">
+                {book.metadata.categories.map((category) => (
+                  <span
+                    key={category}
+                    className="px-2 py-1 bg-primary/10 text-primary rounded text-xs"
+                  >
+                    {category}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
