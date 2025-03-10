@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { analyzeBookshelfImage } from "./services/openai";
 import { searchBook, getBookById } from "./services/google-books";
 import { insertBookSchema } from "@shared/schema";
+import { nanoid } from "nanoid";
 
 export async function registerRoutes(app: Express) {
   // Get all books sorted by creation time (newest first)
@@ -64,7 +65,7 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Book analysis and creation with automatic library addition
+  // Book analysis and creation
   app.post("/api/analyze", async (req, res) => {
     try {
       const { image } = req.body;
@@ -72,6 +73,7 @@ export async function registerRoutes(app: Express) {
         return res.status(400).json({ message: "Image data is required" });
       }
 
+      const uploadId = nanoid();
       const analysis = await analyzeBookshelfImage(image);
       const books = await Promise.all(
         analysis.books.map(async (book) => {
@@ -101,7 +103,7 @@ export async function registerRoutes(app: Express) {
             return null;
           }
 
-          const savedBook = await storage.createBook(parsed.data);
+          const savedBook = await storage.createBook(parsed.data, uploadId);
           console.log("Saved book:", savedBook);
           return savedBook;
         })
@@ -109,9 +111,31 @@ export async function registerRoutes(app: Express) {
 
       const validBooks = books.filter(Boolean);
       console.log(`Successfully saved ${validBooks.length} books`);
-      res.json({ books: validBooks });
+      res.json({ books: validBooks, uploadId });
     } catch (error) {
       console.error("Error in /api/analyze:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete a single book
+  app.delete("/api/books/:id", async (req, res) => {
+    try {
+      const bookId = parseInt(req.params.id);
+      await storage.deleteBook(bookId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Undo an upload
+  app.delete("/api/uploads/:uploadId", async (req, res) => {
+    try {
+      const { uploadId } = req.params;
+      await storage.deleteBooksByUploadId(uploadId);
+      res.status(204).send();
+    } catch (error) {
       res.status(500).json({ message: error.message });
     }
   });

@@ -1,34 +1,27 @@
-import type { Book, InsertBook, Library, InsertLibrary } from "@shared/schema";
+import type { Book, InsertBook } from "@shared/schema";
 
 export interface IStorage {
   // Book operations
-  createBook(book: InsertBook): Promise<Book>;
+  createBook(book: InsertBook, uploadId: string): Promise<Book>;
   getBook(id: number): Promise<Book | undefined>;
   getBooks(): Promise<Book[]>;
+  deleteBook(id: number): Promise<void>;
+  deleteBooksByUploadId(uploadId: string): Promise<void>;
   searchBooks(query: string): Promise<Book[]>;
-
-  // Library operations
-  addToLibrary(entry: InsertLibrary): Promise<Library>;
-  getLibrary(userId: number): Promise<Library[]>;
-  removeFromLibrary(userId: number, bookId: number): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
-  private books: Map<number, Book>;
-  private libraries: Map<number, Library>;
+  private books: Map<number, Book & { uploadId: string }>;
   private bookId: number;
-  private libraryId: number;
 
   constructor() {
     this.books = new Map();
-    this.libraries = new Map();
     this.bookId = 1;
-    this.libraryId = 1;
   }
 
-  async createBook(book: InsertBook): Promise<Book> {
+  async createBook(book: InsertBook, uploadId: string): Promise<Book> {
     const id = this.bookId++;
-    const newBook: Book = {
+    const newBook: Book & { uploadId: string } = {
       ...book,
       id,
       metadata: book.metadata ?? null,
@@ -36,7 +29,8 @@ export class MemStorage implements IStorage {
       coverUrl: book.coverUrl ?? null,
       description: book.description ?? null,
       pageCount: book.pageCount ?? null,
-      googleBooksId: book.googleBooksId ?? null
+      googleBooksId: book.googleBooksId ?? null,
+      uploadId
     };
     this.books.set(id, newBook);
     console.log(`Created book with ID ${id}:`, newBook);
@@ -53,6 +47,19 @@ export class MemStorage implements IStorage {
     return books;
   }
 
+  async deleteBook(id: number): Promise<void> {
+    this.books.delete(id);
+    console.log(`Deleted book with ID ${id}`);
+  }
+
+  async deleteBooksByUploadId(uploadId: string): Promise<void> {
+    const booksToDelete = Array.from(this.books.entries())
+      .filter(([_, book]) => book.uploadId === uploadId);
+
+    booksToDelete.forEach(([id]) => this.books.delete(id));
+    console.log(`Deleted ${booksToDelete.length} books from upload ${uploadId}`);
+  }
+
   async searchBooks(query: string): Promise<Book[]> {
     const lowercaseQuery = query.toLowerCase();
     return Array.from(this.books.values()).filter(
@@ -60,32 +67,6 @@ export class MemStorage implements IStorage {
         book.title.toLowerCase().includes(lowercaseQuery) ||
         book.author.toLowerCase().includes(lowercaseQuery)
     );
-  }
-
-  async addToLibrary(entry: InsertLibrary): Promise<Library> {
-    const id = this.libraryId++;
-    const newEntry: Library = {
-      ...entry,
-      id,
-      shelfName: entry.shelfName ?? 'Default'
-    };
-    this.libraries.set(id, newEntry);
-    return newEntry;
-  }
-
-  async getLibrary(userId: number): Promise<Library[]> {
-    return Array.from(this.libraries.values())
-      .filter(entry => entry.userId === userId);
-  }
-
-  async removeFromLibrary(userId: number, bookId: number): Promise<void> {
-    const entries = Array.from(this.libraries.entries());
-    for (const [key, entry] of entries) {
-      if (entry.userId === userId && entry.bookId === bookId) {
-        this.libraries.delete(key);
-        return;
-      }
-    }
   }
 }
 
