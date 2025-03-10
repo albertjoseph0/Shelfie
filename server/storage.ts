@@ -39,6 +39,7 @@ export class MemStorage implements IStorage {
       googleBooksId: book.googleBooksId ?? null
     };
     this.books.set(id, newBook);
+    console.log(`Created book with ID ${id}:`, newBook);
     return newBook;
   }
 
@@ -47,7 +48,9 @@ export class MemStorage implements IStorage {
   }
 
   async getBooks(): Promise<Book[]> {
-    return Array.from(this.books.values());
+    const books = Array.from(this.books.values());
+    console.log(`Retrieved ${books.length} books from storage`);
+    return books;
   }
 
   async searchBooks(query: string): Promise<Book[]> {

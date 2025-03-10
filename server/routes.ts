@@ -6,6 +6,16 @@ import { searchBook, getBookById } from "./services/google-books";
 import { insertBookSchema, insertLibrarySchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express) {
+  // Get all books
+  app.get("/api/books", async (_req, res) => {
+    try {
+      const books = await storage.getBooks();
+      res.json(books);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Book analysis and creation
   app.post("/api/analyze", async (req, res) => {
     try {
@@ -37,14 +47,22 @@ export async function registerRoutes(app: Express) {
           };
 
           const parsed = insertBookSchema.safeParse(bookData);
-          if (!parsed.success) return null;
+          if (!parsed.success) {
+            console.error("Book validation failed:", parsed.error);
+            return null;
+          }
 
-          return await storage.createBook(parsed.data);
+          const savedBook = await storage.createBook(parsed.data);
+          console.log("Saved book:", savedBook);
+          return savedBook;
         })
       );
 
-      res.json({ books: books.filter(Boolean) });
+      const validBooks = books.filter(Boolean);
+      console.log(`Successfully saved ${validBooks.length} books`);
+      res.json({ books: validBooks });
     } catch (error) {
+      console.error("Error in /api/analyze:", error);
       res.status(500).json({ message: error.message });
     }
   });
