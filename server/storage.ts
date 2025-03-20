@@ -1,4 +1,7 @@
 import type { Book, InsertBook } from "@shared/schema";
+import { db } from "./db";
+import { books } from "@shared/schema";
+import { eq, and, like, or } from "drizzle-orm";
 
 export interface IStorage {
   // Book operations with userId
@@ -10,6 +13,74 @@ export interface IStorage {
   searchBooks(query: string, userId: string): Promise<Book[]>;
 }
 
+export class DatabaseStorage implements IStorage {
+  async createBook(book: InsertBook, uploadId: string, userId: string): Promise<Book> {
+    const [newBook] = await db
+      .insert(books)
+      .values({
+        ...book,
+        userId,
+        uploadId
+      })
+      .returning();
+
+    console.log(`Created book with ID ${newBook.id} for user ${userId}:`, newBook);
+    return newBook;
+  }
+
+  async getBook(id: number, userId: string): Promise<Book | undefined> {
+    const [book] = await db
+      .select()
+      .from(books)
+      .where(and(eq(books.id, id), eq(books.userId, userId)));
+    return book;
+  }
+
+  async getBooks(userId: string): Promise<Book[]> {
+    const userBooks = await db
+      .select()
+      .from(books)
+      .where(eq(books.userId, userId));
+
+    console.log(`Retrieved ${userBooks.length} books for user ${userId}`);
+    return userBooks;
+  }
+
+  async deleteBook(id: number, userId: string): Promise<void> {
+    await db
+      .delete(books)
+      .where(and(eq(books.id, id), eq(books.userId, userId)));
+
+    console.log(`Deleted book with ID ${id} for user ${userId}`);
+  }
+
+  async deleteBooksByUploadId(uploadId: string, userId: string): Promise<void> {
+    const result = await db
+      .delete(books)
+      .where(and(eq(books.uploadId, uploadId), eq(books.userId, userId)));
+
+    console.log(`Deleted books from upload ${uploadId} for user ${userId}`);
+  }
+
+  async searchBooks(query: string, userId: string): Promise<Book[]> {
+    const lowercaseQuery = `%${query.toLowerCase()}%`;
+
+    const results = await db
+      .select()
+      .from(books)
+      .where(and(
+        eq(books.userId, userId),
+        or(
+          like(books.title, lowercaseQuery),
+          like(books.author, lowercaseQuery)
+        )
+      ));
+
+    return results;
+  }
+}
+
+// Keep MemStorage for development if needed
 export class MemStorage implements IStorage {
   private books: Map<number, Book & { uploadId: string, userId: string }>;
   private bookId: number;
@@ -70,11 +141,13 @@ export class MemStorage implements IStorage {
     const lowercaseQuery = query.toLowerCase();
     return Array.from(this.books.values())
       .filter(book => book.userId === userId)
-      .filter(book => 
+      .filter(book =>
         book.title.toLowerCase().includes(lowercaseQuery) ||
         book.author.toLowerCase().includes(lowercaseQuery)
       );
   }
 }
 
-export const storage = new MemStorage();
+// Switch storage implementation based on environment
+const isProduction = process.env.NODE_ENV === 'production';
+export const storage = isProduction ? new DatabaseStorage() : new MemStorage();

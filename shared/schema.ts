@@ -4,6 +4,8 @@ import { z } from "zod";
 
 export const books = pgTable("books", {
   id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  uploadId: text("upload_id").notNull(),
   title: text("title").notNull(),
   author: text("author").notNull(),
   isbn: text("isbn"),
@@ -20,7 +22,9 @@ export const books = pgTable("books", {
 });
 
 export const insertBookSchema = createInsertSchema(books).omit({ 
-  id: true 
+  id: true,
+  userId: true, 
+  uploadId: true 
 });
 
 export const libraries = pgTable("libraries", {
