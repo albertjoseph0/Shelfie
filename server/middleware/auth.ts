@@ -1,6 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import { ClerkExpressRequireAuth, ClerkExpressWithAuth } from '@clerk/clerk-sdk-node';
 
+// Validate required environment variables
+if (!process.env.CLERK_SECRET_KEY) {
+  console.error('Error: CLERK_SECRET_KEY environment variable is required');
+  process.exit(1);
+}
+
 // Extend Express Request to include auth information
 declare global {
   namespace Express {
