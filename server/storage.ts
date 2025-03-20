@@ -15,6 +15,7 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async createBook(book: InsertBook, uploadId: string, userId: string): Promise<Book> {
+    console.log('Attempting to create book:', { book, uploadId, userId });
     const [newBook] = await db
       .insert(books)
       .values({
