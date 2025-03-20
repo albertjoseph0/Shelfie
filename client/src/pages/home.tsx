@@ -1,13 +1,22 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { SignedIn, SignedOut, useAuth, SignInButton } from '@clerk/clerk-react';
+import { SignedIn, SignedOut, useAuth, SignInButton } from "@clerk/clerk-react";
 import { Link } from "wouter";
 import type { Book } from "@shared/schema";
 import UploadDialog from "@/components/upload-dialog";
 import BookGrid from "@/components/book-grid";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Book as BookIcon, Download, Camera, CheckCircle, BookOpenCheck, Shield, Database, Zap } from "lucide-react";
+import {
+  Book as BookIcon,
+  Download,
+  Camera,
+  CheckCircle,
+  BookOpenCheck,
+  Shield,
+  Database,
+  Zap,
+} from "lucide-react";
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -15,19 +24,19 @@ export default function Home() {
 
   const { data: books = [] } = useQuery<Book[]>({
     queryKey: ["/api/books"],
-    enabled: isSignedIn
+    enabled: isSignedIn,
   });
 
   const filteredBooks = searchQuery
     ? books.filter(
         (book) =>
           book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          book.author.toLowerCase().includes(searchQuery.toLowerCase())
+          book.author.toLowerCase().includes(searchQuery.toLowerCase()),
       )
     : books;
 
   const handleExport = () => {
-    window.location.href = '/api/export';
+    window.location.href = "/api/export";
   };
 
   return (
@@ -41,7 +50,9 @@ export default function Home() {
                 Turn Your Physical Bookshelf into a Digital Library in Seconds
               </h1>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Simply snap a photo of your bookshelf and watch as AI identifies and catalogs your entire collection. No more manual entry, no more hassle.
+                Simply snap a photo of your bookshelf and watch as AI identifies
+                and catalogs your entire collection. No more manual entry, no
+                more hassle.
               </p>
               <div className="pt-4">
                 <SignInButton mode="modal">
@@ -58,14 +69,16 @@ export default function Home() {
                 <Camera className="h-8 w-8 mx-auto text-primary" />
                 <h3 className="text-lg font-semibold">Snap a Photo</h3>
                 <p className="text-muted-foreground">
-                  Take a single photo of your bookshelf and let our AI do the rest
+                  Take a single photo of your bookshelf and let our AI do the
+                  rest
                 </p>
               </div>
               <div className="text-center space-y-3">
                 <BookOpenCheck className="h-8 w-8 mx-auto text-primary" />
                 <h3 className="text-lg font-semibold">Instant Recognition</h3>
                 <p className="text-muted-foreground">
-                  Advanced AI identifies titles, authors, and book details automatically
+                  Advanced AI identifies titles, authors, and book details
+                  automatically
                 </p>
               </div>
               <div className="text-center space-y-3">
@@ -87,7 +100,9 @@ export default function Home() {
 
             {/* Pricing Section */}
             <div className="py-16 text-center">
-              <h2 className="text-3xl font-bold mb-12">Simple, Transparent Pricing</h2>
+              <h2 className="text-3xl font-bold mb-12">
+                Simple, Transparent Pricing
+              </h2>
               <div className="max-w-md mx-auto rounded-xl border bg-card p-8">
                 <div className="mb-8">
                   <span className="text-4xl font-bold">$20</span>
@@ -114,7 +129,7 @@ export default function Home() {
                 <div className="mt-8">
                   <SignInButton mode="modal">
                     <Button size="lg" variant="default">
-                      Get Started
+                      Start Cataloging
                     </Button>
                   </SignInButton>
                 </div>
@@ -127,13 +142,15 @@ export default function Home() {
               <div className="grid md:grid-cols-3 gap-6">
                 <div className="p-6 rounded-lg bg-card border">
                   <p className="text-muted-foreground">
-                    "Finally, a way to digitize my collection without typing everything manually!"
+                    "Finally, a way to digitize my collection without typing
+                    everything manually!"
                   </p>
                   <p className="mt-2 font-medium">Sarah K.</p>
                 </div>
                 <div className="p-6 rounded-lg bg-card border">
                   <p className="text-muted-foreground">
-                    "The AI recognition is incredibly accurate. Saved me hours of work."
+                    "The AI recognition is incredibly accurate. Saved me hours
+                    of work."
                   </p>
                   <p className="mt-2 font-medium">Michael R.</p>
                 </div>
@@ -151,11 +168,10 @@ export default function Home() {
         <SignedIn>
           <div className="max-w-6xl mx-auto px-4 space-y-8">
             <div className="text-center space-y-4">
-              <h1 className="text-3xl font-bold">
-                Your Digital Library
-              </h1>
+              <h1 className="text-3xl font-bold">Your Digital Library</h1>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                Manage your book collection with ease. Upload photos of your bookshelves or search through your existing catalog.
+                Manage your book collection with ease. Upload photos of your
+                bookshelves or search through your existing catalog.
               </p>
               <div className="flex justify-center gap-4">
                 <UploadDialog
@@ -164,7 +180,12 @@ export default function Home() {
                   }}
                 />
                 {books.length > 0 && (
-                  <Button variant="outline" onClick={handleExport} size="lg" className="gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleExport}
+                    size="lg"
+                    className="gap-2"
+                  >
                     <Download className="h-5 w-5" />
                     Export Library
                   </Button>
@@ -215,17 +236,23 @@ export default function Home() {
               <ul className="space-y-2 text-sm">
                 <li>
                   <Link href="/about">
-                    <Button variant="link" className="h-auto p-0">About Us</Button>
+                    <Button variant="link" className="h-auto p-0">
+                      About Us
+                    </Button>
                   </Link>
                 </li>
                 <li>
                   <Link href="/features">
-                    <Button variant="link" className="h-auto p-0">Features</Button>
+                    <Button variant="link" className="h-auto p-0">
+                      Features
+                    </Button>
                   </Link>
                 </li>
                 <li>
                   <Link href="/pricing">
-                    <Button variant="link" className="h-auto p-0">Pricing</Button>
+                    <Button variant="link" className="h-auto p-0">
+                      Pricing
+                    </Button>
                   </Link>
                 </li>
               </ul>
@@ -237,17 +264,23 @@ export default function Home() {
               <ul className="space-y-2 text-sm">
                 <li>
                   <Link href="/privacy">
-                    <Button variant="link" className="h-auto p-0">Privacy Policy</Button>
+                    <Button variant="link" className="h-auto p-0">
+                      Privacy Policy
+                    </Button>
                   </Link>
                 </li>
                 <li>
                   <Link href="/terms">
-                    <Button variant="link" className="h-auto p-0">Terms of Service</Button>
+                    <Button variant="link" className="h-auto p-0">
+                      Terms of Service
+                    </Button>
                   </Link>
                 </li>
                 <li>
                   <Link href="/cookies">
-                    <Button variant="link" className="h-auto p-0">Cookie Policy</Button>
+                    <Button variant="link" className="h-auto p-0">
+                      Cookie Policy
+                    </Button>
                   </Link>
                 </li>
               </ul>
@@ -258,13 +291,18 @@ export default function Home() {
               <h3 className="font-semibold mb-4">Contact</h3>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <a href="mailto:support@shelfie.app" className="text-muted-foreground hover:text-foreground">
+                  <a
+                    href="mailto:support@shelfie.app"
+                    className="text-muted-foreground hover:text-foreground"
+                  >
                     support@shelfie.app
                   </a>
                 </li>
                 <li className="text-muted-foreground">
-                  123 Book Street<br />
-                  Library District<br />
+                  123 Book Street
+                  <br />
+                  Library District
+                  <br />
                   Reading, RG1 1AA
                 </li>
               </ul>
@@ -273,7 +311,9 @@ export default function Home() {
 
           {/* Copyright */}
           <div className="border-t mt-12 pt-8 text-center text-sm text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} Shelfie. All rights reserved.</p>
+            <p>
+              &copy; {new Date().getFullYear()} Shelfie. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>
