@@ -125,22 +125,87 @@ export async function handleWebhookEvent(payload: any, signature: string) {
       webhookSecret
     );
 
+    console.log(`Processing webhook event: ${event.type}`);
+
     switch (event.type) {
-      case 'checkout.session.completed':
+      case 'checkout.session.completed': {
         // Handle successful checkout
-        const session = event.data.object;
-        // Store customer info, activate subscription, etc.
-        console.log(`Payment succeeded for session: ${session.id}`);
+        const session = event.data.object as Stripe.Checkout.Session;
+        
+        // Get the customer and userId
+        const userId = session.client_reference_id || session.metadata?.userId;
+        
+        if (!userId) {
+          console.warn('No userId found in session metadata or client_reference_id');
+          break;
+        }
+
+        // Ensure customer exists and has metadata
+        if (session.customer) {
+          const customerId = typeof session.customer === 'string' 
+            ? session.customer 
+            : session.customer.id;
+            
+          // Update customer with userId in metadata
+          await stripe.customers.update(customerId, {
+            metadata: { userId }
+          });
+          
+          console.log(`Updated customer ${customerId} with userId ${userId}`);
+        }
+        
+        console.log(`Payment succeeded for session: ${session.id}, userId: ${userId}`);
         break;
-      case 'customer.subscription.deleted':
+      }
+      
+      case 'customer.subscription.created': {
+        // Handle new subscription
+        const subscription = event.data.object as Stripe.Subscription;
+        const customerId = subscription.customer as string;
+        
+        // Get customer to check metadata
+        const customer = await stripe.customers.retrieve(customerId);
+        
+        if (!customer || customer.deleted) {
+          console.warn(`Customer ${customerId} not found or deleted`);
+          break;
+        }
+        
+        const userId = customer.metadata?.userId;
+        if (userId) {
+          console.log(`New subscription ${subscription.id} created for userId: ${userId}`);
+        } else {
+          console.warn(`Subscription ${subscription.id} created but no userId in customer metadata`);
+        }
+        break;
+      }
+      
+      case 'customer.subscription.deleted': {
         // Handle subscription cancellation
-        const subscription = event.data.object;
-        console.log(`Subscription ${subscription.id} was cancelled`);
+        const subscription = event.data.object as Stripe.Subscription;
+        const customerId = subscription.customer as string;
+        
+        // Get customer to check metadata
+        const customer = await stripe.customers.retrieve(customerId);
+        
+        if (!customer || customer.deleted) {
+          console.warn(`Customer ${customerId} not found or deleted`);
+          break;
+        }
+        
+        const userId = customer.metadata?.userId;
+        if (userId) {
+          console.log(`Subscription ${subscription.id} cancelled for userId: ${userId}`);
+        } else {
+          console.warn(`Subscription ${subscription.id} cancelled but no userId in customer metadata`);
+        }
         break;
+      }
+      
       // Add other webhook handlers as needed
     }
 
-    return { received: true };
+    return { received: true, event_type: event.type };
   } catch (error) {
     console.error('Webhook error:', error);
     throw error;

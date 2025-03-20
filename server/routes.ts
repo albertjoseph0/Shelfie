@@ -19,16 +19,31 @@ export async function registerRoutes(app: Express) {
     res.json({ status: "ok" });
   });
 
-  // Protected routes - all API endpoints that need auth
-  app.get("/api/books", requireAuth, ensureUserId, async (req, res) => {
+  // Books endpoint - returns empty array if not authenticated
+  app.get("/api/books", extractUserId, async (req, res) => {
     try {
-      const books = await storage.getBooks(req.userId);
+      // Check if user is authenticated
+      const userId = req.auth?.userId;
+      
+      if (!userId) {
+        // Return empty array if not authenticated
+        return res.json([]);
+      }
+      
+      // Add userId to req for storage function
+      req.userId = userId;
+      
+      const books = await storage.getBooks(userId);
       books.sort((a, b) => {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
       res.json(books);
-    } catch (error) {
-      res.status(500).json({ message: error.message });
+    } catch (error: any) {
+      console.error("Error fetching books:", error);
+      res.status(500).json({ 
+        success: false,
+        message: error.message || "Error fetching books" 
+      });
     }
   });
 
