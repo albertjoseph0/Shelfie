@@ -21,6 +21,14 @@ Shelfie is a modern web application that makes cataloging your physical book col
 - **Image Analysis**: OpenAI GPT-4 Vision
 - **Database**: PostgreSQL with Drizzle ORM
 - **State Management**: TanStack Query
+- **Serverless Functions**: Vercel Edge Functions
+
+## 🏗️ Architecture
+
+- **Serverless First**: All API endpoints are implemented as serverless functions
+- **Edge-Ready**: Optimized for Vercel's edge network
+- **Type-Safe**: Full TypeScript implementation with shared types
+- **Modular Design**: Separate function handlers for each API endpoint
 
 ## 🛠️ Setup
 
@@ -57,7 +65,12 @@ DATABASE_URL=your_postgresql_url
    npm install
    ```
 
-2. Start the development server:
+2. Install Vercel CLI (optional, for local testing):
+   ```bash
+   npm install -g vercel
+   ```
+
+3. Start the development server:
    ```bash
    npm run dev
    ```
@@ -101,9 +114,33 @@ The application will be available at `http://localhost:5000`.
 - API endpoints are protected and require authentication
 - Book data is associated with specific user accounts
 
+## ⚠️ Development Notes
+
+### Current Limitations
+
+- The development environment uses in-memory storage which is NOT suitable for production
+- Data will be lost between function invocations in serverless environment
+- Multiple function instances may run simultaneously
+
+### Production Deployment
+
+Before deploying to production:
+1. Implement persistent database storage
+2. Configure proper environment variables in Vercel dashboard
+3. Test all API endpoints in serverless environment
+4. Ensure proper error handling and logging
+
 ## 📝 Notes
 
 - Supported image formats: JPG, PNG
 - Maximum image size: 50MB
 - Books are ordered by date added (newest first)
 - The application requires an active internet connection for AI analysis and book information retrieval
+
+## 🚀 Deployment
+
+The application is designed to be deployed on Vercel:
+1. Push your code to a Git repository
+2. Import the repository in Vercel
+3. Configure environment variables
+4. Deploy
