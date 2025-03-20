@@ -1,0 +1,616 @@
+Clerk Authentication Implementation Plan for Shelfie
+1. Frontend Setup (Client-Side)
+1.1. Install Clerk and Environment Setup
+npm install @clerk/clerk-react
+Create a .env file at the project root with your Clerk API keys:
+# Existing keys
+OPENAI_API_KEY=your_openai_key
+GOOGLE_BOOKS_API_KEY=your_google_books_key
+
+# Add Clerk keys
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_your_publishable_key
+CLERK_SECRET_KEY=sk_test_your_secret_key
+1.2. Update Main Entry Point
+Modify client/src/main.tsx:
+import { createRoot } from "react-dom/client";
+import { ClerkProvider } from '@clerk/clerk-react';
+import App from "./App";
+import "./index.css";
+
+// Import Clerk publishable key
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+if (!PUBLISHABLE_KEY) {
+  throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY");
+}
+
+createRoot(document.getElementById("root")!).render(
+  <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+    <App />
+  </ClerkProvider>
+);
+1.3. Create Authentication Routes and Protection
+Modify client/src/App.tsx to include authentication routes:
+import { Switch, Route } from "wouter";
+import { queryClient } from "./lib/queryClient";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
+import NotFound from "@/pages/not-found";
+import Home from "@/pages/home";
+import Navbar from "@/components/navbar";
+
+// Auth protection component
+const ProtectedRoute = ({ component: Component, ...rest }) => (
+  <>
+    <SignedIn>
+      <Component {...rest} />
+    </SignedIn>
+    <SignedOut>
+      <RedirectToSignIn />
+    </SignedOut>
+  </>
+);
+
+function Router() {
+  return (
+    <Switch>
+      {/* Public landing page */}
+      <Route path="/" component={Home} />
+      
+      {/* Protected routes */}
+      <Route path="/library">
+        {() => <ProtectedRoute component={Home} />}
+      </Route>
+      
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="container mx-auto px-4 py-8">
+          <Router />
+        </main>
+      </div>
+      <Toaster />
+    </QueryClientProvider>
+  );
+}
+
+export default App;
+1.4. Update Navbar Component
+Modify client/src/components/navbar.tsx to include Clerk components:
+import { Link } from "wouter";
+import { Book } from "lucide-react";
+import { SignedIn, SignedOut, UserButton, SignInButton } from '@clerk/clerk-react';
+import { Button } from "@/components/ui/button";
+
+export default function Navbar() {
+  return (
+    <nav className="border-b bg-card">
+      <div className="container mx-auto px-4">
+        <div className="flex h-16 items-center justify-between">
+          <Link href="/">
+            <a className="flex items-center space-x-2">
+              <Book className="h-6 w-6 text-primary" />
+              <span className="font-merriweather text-xl font-bold">Shelfie</span>
+            </a>
+          </Link>
+          
+          <div className="flex items-center space-x-4">
+            <SignedIn>
+              <Link href="/library">
+                <a className="text-sm font-medium hover:text-primary">My Library</a>
+              </Link>
+              <UserButton />
+            </SignedIn>
+            
+            <SignedOut>
+              <SignInButton mode="modal">
+                <Button variant="outline" size="sm">Sign In</Button>
+              </SignInButton>
+            </SignedOut>
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+}
+2. Backend Setup (Server-Side)
+2.1. Install Clerk SDK for Node.js
+npm install @clerk/clerk-sdk-node
+2.2. Create Authentication Middleware
+Create a new file server/middleware/auth.ts:
+import { Request, Response, NextFunction } from "express";
+import { ClerkExpressRequireAuth, ClerkExpressWithAuth } from '@clerk/clerk-sdk-node';
+
+// Extend Express Request to include auth information
+declare global {
+  namespace Express {
+    interface Request {
+      auth: {
+        userId: string | null;
+        sessionId: string | null;
+        orgId: string | null;
+      }
+    }
+  }
+}
+
+// Middleware to extract userId and make it available in req
+export const extractUserId = ClerkExpressWithAuth({
+  jwtKey: process.env.CLERK_JWT_KEY,
+  secretKey: process.env.CLERK_SECRET_KEY,
+});
+
+// Middleware to require authentication for specific routes
+export const requireAuth = ClerkExpressRequireAuth({
+  jwtKey: process.env.CLERK_JWT_KEY,
+  secretKey: process.env.CLERK_SECRET_KEY,
+});
+
+// Helper middleware to ensure userId exists and convert it to internal format
+export const ensureUserId = (req: Request, res: Response, next: NextFunction) => {
+  const clerkUserId = req.auth?.userId;
+  
+  if (!clerkUserId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  // You might want to transform the clerk user ID or perform additional validation
+  req.userId = clerkUserId;
+  next();
+};
+2.3. Modify Storage for User Association
+Update server/storage.ts to include user IDs:
+import type { Book, InsertBook } from "@shared/schema";
+
+export interface IStorage {
+  // Book operations with userId
+  createBook(book: InsertBook, uploadId: string, userId: string): Promise<Book>;
+  getBook(id: number, userId: string): Promise<Book | undefined>;
+  getBooks(userId: string): Promise<Book[]>;
+  deleteBook(id: number, userId: string): Promise<void>;
+  deleteBooksByUploadId(uploadId: string, userId: string): Promise<void>;
+  searchBooks(query: string, userId: string): Promise<Book[]>;
+}
+
+export class MemStorage implements IStorage {
+  private books: Map<number, Book & { uploadId: string, userId: string }>;
+  private bookId: number;
+
+  constructor() {
+    this.books = new Map();
+    this.bookId = 1;
+  }
+
+  async createBook(book: InsertBook, uploadId: string, userId: string): Promise<Book> {
+    const id = this.bookId++;
+    const newBook: Book & { uploadId: string, userId: string } = {
+      ...book,
+      id,
+      metadata: book.metadata ?? null,
+      isbn: book.isbn ?? null,
+      coverUrl: book.coverUrl ?? null,
+      description: book.description ?? null,
+      pageCount: book.pageCount ?? null,
+      googleBooksId: book.googleBooksId ?? null,
+      uploadId,
+      userId
+    };
+    this.books.set(id, newBook);
+    console.log(`Created book with ID ${id} for user ${userId}:`, newBook);
+    return newBook;
+  }
+
+  async getBook(id: number, userId: string): Promise<Book | undefined> {
+    const book = this.books.get(id);
+    return book && book.userId === userId ? book : undefined;
+  }
+
+  async getBooks(userId: string): Promise<Book[]> {
+    const books = Array.from(this.books.values())
+      .filter(book => book.userId === userId);
+    console.log(`Retrieved ${books.length} books for user ${userId}`);
+    return books;
+  }
+
+  async deleteBook(id: number, userId: string): Promise<void> {
+    const book = this.books.get(id);
+    if (book && book.userId === userId) {
+      this.books.delete(id);
+      console.log(`Deleted book with ID ${id} for user ${userId}`);
+    }
+  }
+
+  async deleteBooksByUploadId(uploadId: string, userId: string): Promise<void> {
+    const booksToDelete = Array.from(this.books.entries())
+      .filter(([_, book]) => book.uploadId === uploadId && book.userId === userId);
+
+    booksToDelete.forEach(([id]) => this.books.delete(id));
+    console.log(`Deleted ${booksToDelete.length} books from upload ${uploadId} for user ${userId}`);
+  }
+
+  async searchBooks(query: string, userId: string): Promise<Book[]> {
+    const lowercaseQuery = query.toLowerCase();
+    return Array.from(this.books.values())
+      .filter(book => book.userId === userId)
+      .filter(book => 
+        book.title.toLowerCase().includes(lowercaseQuery) ||
+        book.author.toLowerCase().includes(lowercaseQuery)
+      );
+  }
+}
+
+export const storage = new MemStorage();
+2.4. Update API Routes to Use Auth
+Modify server/routes.ts to include authentication:
+import type { Express } from "express";
+import { createServer } from "http";
+import { storage } from "./storage";
+import { analyzeBookshelfImage } from "./services/openai";
+import { searchBook, getBookById } from "./services/google-books";
+import { insertBookSchema } from "@shared/schema";
+import { nanoid } from "nanoid";
+import { extractUserId, requireAuth, ensureUserId } from "./middleware/auth";
+
+export async function registerRoutes(app: Express) {
+  // Add authentication middleware to all routes
+  app.use(extractUserId);
+  
+  // Public routes
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok" });
+  });
+
+  // Protected routes - all API endpoints that need auth
+  app.get("/api/books", requireAuth, ensureUserId, async (req, res) => {
+    try {
+      const books = await storage.getBooks(req.userId);
+      books.sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      res.json(books);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Export library as CSV - protected
+  app.get("/api/export", requireAuth, ensureUserId, async (req, res) => {
+    try {
+      const books = await storage.getBooks(req.userId);
+      // CSV generation code remains the same...
+      // [CSV generation code...]
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=my-library.csv');
+      res.send(csvRows.join("\n"));
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Book analysis and creation - protected
+  app.post("/api/analyze", requireAuth, ensureUserId, async (req, res) => {
+    try {
+      const { image } = req.body;
+      if (!image) {
+        return res.status(400).json({ message: "Image data is required" });
+      }
+
+      const uploadId = nanoid();
+      const analysis = await analyzeBookshelfImage(image);
+      
+      // Process books code remains similar but adds userId
+      const books = await Promise.all(
+        analysis.books.map(async (book) => {
+          // [Book processing code...]
+          // Pass userId to createBook
+          const savedBook = await storage.createBook(parsed.data, uploadId, req.userId);
+          return savedBook;
+        })
+      );
+
+      const validBooks = books.filter(Boolean);
+      res.json({ books: validBooks, uploadId });
+    } catch (error) {
+      console.error("Error in /api/analyze:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete a single book - protected
+  app.delete("/api/books/:id", requireAuth, ensureUserId, async (req, res) => {
+    try {
+      const bookId = parseInt(req.params.id);
+      await storage.deleteBook(bookId, req.userId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Undo an upload - protected
+  app.delete("/api/uploads/:uploadId", requireAuth, ensureUserId, async (req, res) => {
+    try {
+      const { uploadId } = req.params;
+      await storage.deleteBooksByUploadId(uploadId, req.userId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get detailed book info - protected
+  app.get("/api/books/:id/details", requireAuth, ensureUserId, async (req, res) => {
+    try {
+      const book = await storage.getBook(parseInt(req.params.id), req.userId);
+      if (!book?.googleBooksId) {
+        return res.status(404).json({ message: "Book not found" });
+      }
+
+      const details = await getBookById(book.googleBooksId);
+      res.json(details);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  const httpServer = createServer(app);
+  return httpServer;
+}
+2.5. Update Express App Entry Point
+Modify server/index.ts to load Clerk environment variables:
+import express, { type Request, Response, NextFunction } from "express";
+import { registerRoutes } from "./routes";
+import { setupVite, serveStatic, log } from "./vite";
+import dotenv from "dotenv";
+
+// Load environment variables from .env file
+dotenv.config();
+
+// Check for required environment variables
+if (!process.env.CLERK_SECRET_KEY) {
+  throw new Error("CLERK_SECRET_KEY is required");
+}
+
+const app = express();
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+
+// Rest of the file remains the same
+// ...
+3. Schema Updates
+3.1. Update Shared Schema
+Modify shared/schema.ts to include userId:
+import { pgTable, text, serial, integer, jsonb } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+export const books = pgTable("books", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(), // Add userId field
+  title: text("title").notNull(),
+  author: text("author").notNull(),
+  isbn: text("isbn"),
+  coverUrl: text("cover_url"),
+  description: text("description"),
+  pageCount: integer("page_count"),
+  googleBooksId: text("google_books_id"),
+  createdAt: text("created_at").notNull(),
+  metadata: jsonb("metadata").$type<{
+    categories?: string[];
+    publishedDate?: string;
+    publisher?: string;
+  }>(),
+});
+
+export const insertBookSchema = createInsertSchema(books).omit({ 
+  id: true,
+  userId: true // Omit userId from insert schema - we'll add it manually
+});
+
+// The rest of the schema remains the same...
+4. Client API Integration
+4.1. Update API Request Utilities
+Modify client/src/lib/queryClient.ts to include Clerk's session token:
+import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { useAuth } from "@clerk/clerk-react";
+
+async function throwIfResNotOk(res: Response) {
+  if (!res.ok) {
+    const text = (await res.text()) || res.statusText;
+    throw new Error(`${res.status}: ${text}`);
+  }
+}
+
+export async function apiRequest(
+  method: string,
+  url: string,
+  data?: unknown | undefined,
+): Promise<Response> {
+  // Get token from Clerk (if available)
+  let token;
+  try {
+    const { getToken } = useAuth();
+    token = await getToken();
+  } catch (e) {
+    // If useAuth() is called outside of a component, or authentication fails
+    token = null;
+  }
+
+  const headers: Record<string, string> = {};
+  if (data) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: data ? JSON.stringify(data) : undefined,
+    credentials: "include",
+  });
+
+  await throwIfResNotOk(res);
+  return res;
+}
+
+// Similar updates to getQueryFn to include token from Clerk
+// ...
+
+export const queryClient = new QueryClient({
+  // Existing configuration
+  // ...
+});
+4.2. Create a Custom Auth Hook
+Create a new file client/src/hooks/use-auth.ts:
+import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
+import { useEffect } from 'react';
+import { queryClient } from '@/lib/queryClient';
+
+export function useAuth() {
+  const { isSignedIn, user } = useUser();
+  const { getToken } = useClerkAuth();
+  
+  // Reset query cache when auth state changes
+  useEffect(() => {
+    if (isSignedIn === false) {
+      // Clear all queries when user signs out
+      queryClient.clear();
+    }
+  }, [isSignedIn]);
+
+  return {
+    isSignedIn,
+    user,
+    getToken,
+    
+    // Helper for components that need user ID
+    userId: user?.id || null,
+    
+    // Helper to check if user is fully loaded
+    isLoaded: user !== undefined
+  };
+}
+4.3. Update Home Page to Use Auth
+Modify client/src/pages/home.tsx to differentiate between signed-in and signed-out states:
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { SignedIn, SignedOut, useAuth } from '@clerk/clerk-react';
+import UploadDialog from "@/components/upload-dialog";
+import BookGrid from "@/components/book-grid";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Book, Download } from "lucide-react";
+
+export default function Home() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const { isSignedIn } = useAuth();
+
+  const { data: books = [] } = useQuery({
+    queryKey: ["/api/books"],
+    // Only fetch if signed in
+    enabled: isSignedIn
+  });
+
+  const filteredBooks = searchQuery
+    ? books.filter(
+        (book) =>
+          book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          book.author.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : books;
+
+  const handleExport = () => {
+    window.location.href = '/api/export';
+  };
+
+  return (
+    <div className="space-y-8">
+      <div className="text-center space-y-4">
+        <h1 className="font-merriweather text-4xl font-bold">
+          Welcome to Shelfie
+        </h1>
+        <p className="text-muted-foreground max-w-2xl mx-auto">
+          Catalog your physical book collection with ease. Simply upload a photo of
+          your bookshelf and let AI do the work for you.
+        </p>
+        
+        <SignedIn>
+          <div className="flex justify-center gap-4">
+            <UploadDialog
+              onSuccess={() => {
+                // Query will automatically refresh
+              }}
+            />
+            {books.length > 0 && (
+              <Button variant="outline" onClick={handleExport} size="lg" className="gap-2">
+                <Download className="h-5 w-5" />
+                Export Library
+              </Button>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-4 max-w-md mx-auto">
+            <Input
+              placeholder="Search books..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          {filteredBooks.length > 0 ? (
+            <BookGrid books={filteredBooks} />
+          ) : (
+            <div className="text-center py-12">
+              <Book className="h-12 w-12 mx-auto text-muted-foreground" />
+              <p className="mt-4 text-muted-foreground">
+                No books found. Try uploading a shelf photo!
+              </p>
+            </div>
+          )}
+        </SignedIn>
+        
+        <SignedOut>
+          <div className="mt-8 flex flex-col items-center gap-4">
+            <p className="text-lg">Sign in to start cataloging your books</p>
+            {/* Clerk's SignInButton is already in the navbar */}
+            <img 
+              src="/bookshelf-demo.jpg" 
+              alt="Shelfie Demo" 
+              className="max-w-lg rounded-lg shadow-lg mt-4" 
+            />
+          </div>
+        </SignedOut>
+      </div>
+    </div>
+  );
+}
+5. Testing and Deployment Configuration
+5.1. Environment Variable Setup for Different Environments
+Create a .env.development and .env.production file:
+# .env.development
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_your_test_key
+CLERK_SECRET_KEY=sk_test_your_test_key
+
+# .env.production
+VITE_CLERK_PUBLISHABLE_KEY=pk_live_your_live_key
+CLERK_SECRET_KEY=sk_live_your_live_key
+5.2. Add Scripts to package.json
+Update your scripts in package.json:
+{
+  "scripts": {
+    "dev": "node --env-file=.env.development --loader ts-node/esm server/index.ts",
+    "build": "vite build",
+    "start": "node --env-file=.env.production --loader ts-node/esm server/index.ts",
+    "preview": "vite preview"
+  }
+}

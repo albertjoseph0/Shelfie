@@ -1,5 +1,7 @@
 import { Link } from "wouter";
 import { Book } from "lucide-react";
+import { SignedIn, SignedOut, UserButton, SignInButton } from '@clerk/clerk-react';
+import { Button } from "@/components/ui/button";
 
 export default function Navbar() {
   return (
@@ -12,6 +14,18 @@ export default function Navbar() {
               <span className="font-merriweather text-xl font-bold">Shelfie</span>
             </a>
           </Link>
+
+          <div className="flex items-center space-x-4">
+            <SignedIn>
+              <UserButton afterSignOutUrl="/" />
+            </SignedIn>
+
+            <SignedOut>
+              <SignInButton mode="modal">
+                <Button variant="outline" size="sm">Sign In</Button>
+              </SignInButton>
+            </SignedOut>
+          </div>
         </div>
       </div>
     </nav>
