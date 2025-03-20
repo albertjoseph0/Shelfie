@@ -4,8 +4,6 @@ import { z } from "zod";
 
 export const books = pgTable("books", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull(),
-  uploadId: text("upload_id").notNull(),
   title: text("title").notNull(),
   author: text("author").notNull(),
   isbn: text("isbn"),
@@ -22,13 +20,8 @@ export const books = pgTable("books", {
 });
 
 export const insertBookSchema = createInsertSchema(books).omit({ 
-  id: true,
-  userId: true, 
-  uploadId: true 
+  id: true 
 });
-
-export type Book = typeof books.$inferSelect;
-export type InsertBook = z.infer<typeof insertBookSchema>;
 
 export const libraries = pgTable("libraries", {
   id: serial("id").primaryKey(),
@@ -42,5 +35,7 @@ export const insertLibrarySchema = createInsertSchema(libraries).omit({
   id: true 
 });
 
+export type Book = typeof books.$inferSelect;
+export type InsertBook = z.infer<typeof insertBookSchema>;
 export type Library = typeof libraries.$inferSelect;
 export type InsertLibrary = z.infer<typeof insertLibrarySchema>;
