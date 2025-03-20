@@ -22,17 +22,39 @@ declare global {
 }
 
 // Middleware to extract userId and make it available in req
-export const extractUserId = ClerkExpressWithAuth();
+export const extractUserId = ClerkExpressWithAuth({
+  onError: (err, _req, res) => {
+    console.error('Clerk authentication error:', err);
+    res.status(401).json({
+      error: 'Authentication failed',
+      message: 'Please sign in to continue',
+      code: 'UNAUTHENTICATED'
+    });
+  }
+});
 
 // Middleware to require authentication for specific routes
-export const requireAuth = ClerkExpressRequireAuth();
+export const requireAuth = ClerkExpressRequireAuth({
+  onError: (err, _req, res) => {
+    console.error('Clerk authorization error:', err);
+    res.status(401).json({
+      error: 'Authorization required',
+      message: 'You must be signed in to access this resource',
+      code: 'UNAUTHORIZED'
+    });
+  }
+});
 
 // Helper middleware to ensure userId exists and convert it to internal format
 export const ensureUserId = (req: Request, res: Response, next: NextFunction) => {
   const clerkUserId = req.auth?.userId;
 
   if (!clerkUserId) {
-    return res.status(401).json({ message: "Unauthorized" });
+    return res.status(401).json({
+      error: 'Authorization required',
+      message: 'User ID not found in request',
+      code: 'INVALID_USER'
+    });
   }
 
   // Add userId to request object
