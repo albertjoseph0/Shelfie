@@ -25,6 +25,9 @@ if (missingEnvVars.length > 0) {
 
 const app = express();
 
+// Trust proxy - required for rate limiting behind Replit's proxy
+app.set('trust proxy', 1);
+
 // Body parsing middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));

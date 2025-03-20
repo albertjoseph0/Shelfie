@@ -7,6 +7,17 @@ import { insertBookSchema } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { extractUserId, requireAuth, ensureUserId } from "./middleware/auth";
 import { authLimiter, uploadLimiter } from "./middleware/security";
+import { createCheckoutSession, handleSubscriptionUpdated, isUserSubscribed } from "./services/stripe";
+import Stripe from "stripe";
+import express from 'express';
+
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing STRIPE_SECRET_KEY');
+}
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2023-10-16',
+});
 
 export async function registerRoutes(app: Express) {
   // Add authentication middleware to all routes
@@ -17,8 +28,90 @@ export async function registerRoutes(app: Express) {
     res.json({ status: "ok" });
   });
 
-  // Protected routes - all API endpoints that need auth
-  app.get("/api/books", requireAuth, ensureUserId, async (req, res) => {
+  // Stripe webhook handler
+  app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+
+    if (!process.env.STRIPE_WEBHOOK_SECRET) {
+      return res.status(400).send('Webhook secret not configured');
+    }
+
+    let event: Stripe.Event;
+
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig!, process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (err: any) {
+      console.error('Webhook signature verification failed:', err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    try {
+      if (event.type === 'customer.subscription.updated' || 
+          event.type === 'customer.subscription.created') {
+        const subscription = event.data.object as Stripe.Subscription;
+        await handleSubscriptionUpdated(subscription);
+      }
+
+      res.json({ received: true });
+    } catch (err: any) {
+      console.error('Error handling webhook:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Create checkout session
+  app.post('/api/create-checkout-session', requireAuth, ensureUserId, async (req, res) => {
+    try {
+      if (!req.auth?.userId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+
+      const session = await createCheckoutSession(req.auth.userId, req.body.email);
+      res.json({ url: session.url });
+    } catch (err: any) {
+      console.error('Error creating checkout session:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Check subscription status
+  app.get('/api/subscription', requireAuth, ensureUserId, async (req, res) => {
+    try {
+      if (!req.auth?.userId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+
+      const subscribed = await isUserSubscribed(req.auth.userId);
+      res.json({ subscribed });
+    } catch (err: any) {
+      console.error('Error checking subscription:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Protected routes that require subscription
+  const requireSubscription = async (req: any, res: any, next: any) => {
+    try {
+      if (!req.auth?.userId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+
+      const subscribed = await isUserSubscribed(req.auth.userId);
+      if (!subscribed) {
+        return res.status(403).json({ 
+          message: 'Subscription required',
+          code: 'SUBSCRIPTION_REQUIRED'
+        });
+      }
+
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  // Add subscription check to protected routes
+  app.get("/api/books", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
       const books = await storage.getBooks(req.userId);
       books.sort((a, b) => {
@@ -31,7 +124,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Export library as CSV - protected
-  app.get("/api/export", requireAuth, ensureUserId, async (req, res) => {
+  app.get("/api/export", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
       const books = await storage.getBooks(req.userId);
 
@@ -75,7 +168,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Book analysis and creation - protected and rate limited
-  app.post("/api/analyze", requireAuth, ensureUserId, uploadLimiter, async (req, res) => {
+  app.post("/api/analyze", requireAuth, ensureUserId, requireSubscription, uploadLimiter, async (req, res) => {
     try {
       const { image } = req.body;
       if (!image) {
@@ -127,7 +220,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Delete a single book - protected
-  app.delete("/api/books/:id", requireAuth, ensureUserId, async (req, res) => {
+  app.delete("/api/books/:id", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
       const bookId = parseInt(req.params.id);
       await storage.deleteBook(bookId, req.userId);
@@ -138,7 +231,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Undo an upload - protected
-  app.delete("/api/uploads/:uploadId", requireAuth, ensureUserId, async (req, res) => {
+  app.delete("/api/uploads/:uploadId", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
       const { uploadId } = req.params;
       await storage.deleteBooksByUploadId(uploadId, req.userId);
@@ -149,7 +242,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Get detailed book info - protected
-  app.get("/api/books/:id/details", requireAuth, ensureUserId, async (req, res) => {
+  app.get("/api/books/:id/details", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
       const book = await storage.getBook(parseInt(req.params.id), req.userId);
       if (!book?.googleBooksId) {
