@@ -19,8 +19,24 @@ export async function apiRequest(
     credentials: "include",
   });
 
+  if (res.status === 403 && (await isSubscriptionRequired(res))) {
+    // Redirect to subscription page
+    window.location.href = "/subscribe";
+    throw new Error("Subscription required");
+  }
+
   await throwIfResNotOk(res);
   return res;
+}
+
+async function isSubscriptionRequired(res: Response): Promise<boolean> {
+  try {
+    const clone = res.clone();
+    const json = await clone.json();
+    return json.code === "subscription_required";
+  } catch (e) {
+    return false;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -35,6 +51,14 @@ export const getQueryFn: <T>(options: {
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
+    }
+
+    if (res.status === 403) {
+      const json = await res.json().catch(() => ({}));
+      if (json.code === "subscription_required") {
+        window.location.href = "/subscribe";
+        throw new Error("Subscription required");
+      }
     }
 
     await throwIfResNotOk(res);

@@ -1,4 +1,11 @@
-import { pgTable, text, serial, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  serial,
+  integer,
+  jsonb,
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -21,11 +28,11 @@ export const books = pgTable("books", {
   }>(),
 });
 
-export const insertBookSchema = createInsertSchema(books).omit({ 
+export const insertBookSchema = createInsertSchema(books).omit({
   id: true,
-  userId: true, 
+  userId: true,
   uploadId: true,
-  createdAt: true
+  createdAt: true,
 });
 
 export const libraries = pgTable("libraries", {
@@ -36,11 +43,24 @@ export const libraries = pgTable("libraries", {
   addedAt: timestamp("added_at").defaultNow().notNull(),
 });
 
-export const insertLibrarySchema = createInsertSchema(libraries).omit({ 
-  id: true 
+export const insertLibrarySchema = createInsertSchema(libraries).omit({
+  id: true,
+});
+
+// New subscription schema
+export const subscriptions = pgTable("subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  stripeCustomerId: text("stripe_customer_id").notNull(),
+  stripeSubscriptionId: text("stripe_subscription_id").notNull(),
+  status: text("status").notNull(), // 'active', 'canceled', 'past_due', etc.
+  currentPeriodEnd: timestamp("current_period_end").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export type Book = typeof books.$inferSelect;
 export type InsertBook = z.infer<typeof insertBookSchema>;
 export type Library = typeof libraries.$inferSelect;
 export type InsertLibrary = z.infer<typeof insertLibrarySchema>;
+export type Subscription = typeof subscriptions.$inferSelect;

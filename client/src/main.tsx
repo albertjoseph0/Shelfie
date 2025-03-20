@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
-import { ClerkProvider } from '@clerk/clerk-react';
+import { ClerkProvider } from "@clerk/clerk-react";
+import { SubscriptionProvider } from "./lib/subscription";
 import App from "./App";
 import "./index.css";
 
@@ -12,6 +13,8 @@ if (!PUBLISHABLE_KEY) {
 
 createRoot(document.getElementById("root")!).render(
   <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
-    <App />
-  </ClerkProvider>
+    <SubscriptionProvider>
+      <App />
+    </SubscriptionProvider>
+  </ClerkProvider>,
 );

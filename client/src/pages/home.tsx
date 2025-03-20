@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { SignedIn, SignedOut, useAuth, SignInButton } from "@clerk/clerk-react";
-import { Link } from "wouter";
+import { Link, useNavigate } from "wouter";
 import type { Book } from "@shared/schema";
 import UploadDialog from "@/components/upload-dialog";
 import BookGrid from "@/components/book-grid";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useSubscription } from "@/lib/subscription";
 import {
   Book as BookIcon,
   Download,
@@ -21,10 +22,12 @@ import {
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const { isSignedIn } = useAuth();
+  const navigate = useNavigate();
+  const { isSubscribed } = useSubscription();
 
   const { data: books = [] } = useQuery<Book[]>({
     queryKey: ["/api/books"],
-    enabled: isSignedIn,
+    enabled: isSignedIn && isSubscribed,
   });
 
   const filteredBooks = searchQuery
@@ -57,7 +60,7 @@ export default function Home() {
               <div className="pt-4">
                 <SignInButton mode="modal">
                   <Button size="lg" className="text-lg px-8">
-                    Start Cataloging
+                    Sign In to Start
                   </Button>
                 </SignInButton>
               </div>
@@ -129,7 +132,7 @@ export default function Home() {
                 <div className="mt-8">
                   <SignInButton mode="modal">
                     <Button size="lg" variant="default">
-                      Start Cataloging
+                      Sign In to Start
                     </Button>
                   </SignInButton>
                 </div>
@@ -167,49 +170,71 @@ export default function Home() {
 
         <SignedIn>
           <div className="max-w-6xl mx-auto px-4 space-y-8">
-            <div className="text-center space-y-4">
-              <h1 className="text-3xl font-bold">Your Digital Library</h1>
-              <p className="text-muted-foreground max-w-2xl mx-auto">
-                Manage your book collection with ease. Upload photos of your
-                bookshelves or search through your existing catalog.
-              </p>
-              <div className="flex justify-center gap-4">
-                <UploadDialog
-                  onSuccess={() => {
-                    // Query will automatically refresh
-                  }}
-                />
-                {books.length > 0 && (
-                  <Button
-                    variant="outline"
-                    onClick={handleExport}
-                    size="lg"
-                    className="gap-2"
-                  >
-                    <Download className="h-5 w-5" />
-                    Export Library
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 max-w-md mx-auto">
-              <Input
-                placeholder="Search books..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-
-            {filteredBooks.length > 0 ? (
-              <BookGrid books={filteredBooks} />
-            ) : (
-              <div className="text-center py-12">
-                <BookIcon className="h-12 w-12 mx-auto text-muted-foreground" />
-                <p className="mt-4 text-muted-foreground">
-                  No books found. Try uploading a shelf photo!
+            {!isSubscribed ? (
+              <div className="text-center space-y-4">
+                <h1 className="text-3xl font-bold">
+                  Subscribe to Continue
+                </h1>
+                <p className="text-muted-foreground max-w-2xl mx-auto">
+                  You need an active subscription to access Shelfie's features.
                 </p>
+                <div className="pt-4">
+                  <Button 
+                    size="lg" 
+                    className="text-lg px-8"
+                    onClick={() => navigate('/subscribe')}
+                  >
+                    View Subscription Options
+                  </Button>
+                </div>
               </div>
+            ) : (
+              <>
+                <div className="text-center space-y-4">
+                  <h1 className="text-3xl font-bold">Your Digital Library</h1>
+                  <p className="text-muted-foreground max-w-2xl mx-auto">
+                    Manage your book collection with ease. Upload photos of your
+                    bookshelves or search through your existing catalog.
+                  </p>
+                  <div className="flex justify-center gap-4">
+                    <UploadDialog
+                      onSuccess={() => {
+                        // Query will automatically refresh
+                      }}
+                    />
+                    {books.length > 0 && (
+                      <Button
+                        variant="outline"
+                        onClick={handleExport}
+                        size="lg"
+                        className="gap-2"
+                      >
+                        <Download className="h-5 w-5" />
+                        Export Library
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 max-w-md mx-auto">
+                  <Input
+                    placeholder="Search books..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+
+                {filteredBooks.length > 0 ? (
+                  <BookGrid books={filteredBooks} />
+                ) : (
+                  <div className="text-center py-12">
+                    <BookIcon className="h-12 w-12 mx-auto text-muted-foreground" />
+                    <p className="mt-4 text-muted-foreground">
+                      No books found. Try uploading a shelf photo!
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </SignedIn>
@@ -291,7 +316,7 @@ export default function Home() {
               <h3 className="font-semibold mb-4">Contact</h3>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <a
+
                     href="mailto:support@shelfie.app"
                     className="text-muted-foreground hover:text-foreground"
                   >
