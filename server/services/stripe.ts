@@ -8,9 +8,45 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2025-02-24.acacia' // Use the latest API version
 });
 
-export async function createCheckoutSession(successUrl: string, cancelUrl: string) {
+// This function checks if a user has an active subscription
+export async function checkUserSubscription(userId: string): Promise<boolean> {
   try {
-    const session = await stripe.checkout.sessions.create({
+    // In a real implementation, you would:
+    // 1. Look up the Stripe customer ID for this userId in your database
+    // 2. Query Stripe to check if the customer has an active subscription
+    
+    // For now, we'll use a direct lookup assuming you'll implement 
+    // the customer ID storage later
+    
+    // This is a placeholder implementation
+    const customers = await stripe.customers.list({
+      email: userId, // Using userId as email for demo purposes
+      limit: 1,
+    });
+    
+    if (customers.data.length === 0) {
+      return false; // No customer found
+    }
+    
+    const customerId = customers.data[0].id;
+    
+    // Check for active subscriptions
+    const subscriptions = await stripe.subscriptions.list({
+      customer: customerId,
+      status: 'active',
+      limit: 1,
+    });
+    
+    return subscriptions.data.length > 0;
+  } catch (error) {
+    console.error('Error checking subscription:', error);
+    return false; // Assume no subscription on error
+  }
+}
+
+export async function createCheckoutSession(successUrl: string, cancelUrl: string, userId?: string) {
+  try {
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ['card'],
       line_items: [
         {
@@ -19,7 +55,7 @@ export async function createCheckoutSession(successUrl: string, cancelUrl: strin
             product_data: {
               name: 'Shelfie Monthly Subscription',
               description: 'Catalog up to 50 books per month with Shelfie',
-              images: ['https://your-website.com/images/subscription-image.jpg'], // Replace with your image URL
+              images: ['https://your-domain.com/logo.png'], // You should update this with a real image
             },
             unit_amount: 2000, // $20.00 in cents
             recurring: {
@@ -32,7 +68,17 @@ export async function createCheckoutSession(successUrl: string, cancelUrl: strin
       mode: 'subscription',
       success_url: successUrl,
       cancel_url: cancelUrl,
-    });
+    };
+
+    // If we have a userId, store it as client_reference_id and metadata
+    if (userId) {
+      sessionParams.client_reference_id = userId;
+      sessionParams.metadata = {
+        userId: userId
+      };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
     
     return session;
   } catch (error) {

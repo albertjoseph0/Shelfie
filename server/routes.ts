@@ -4,7 +4,7 @@ import express from "express";
 import { storage } from "./storage";
 import { analyzeBookshelfImage } from "./services/openai";
 import { searchBook, getBookById } from "./services/google-books";
-import { createCheckoutSession, handleWebhookEvent } from "./services/stripe";
+import { createCheckoutSession, handleWebhookEvent, checkUserSubscription } from "./services/stripe";
 import { insertBookSchema } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { extractUserId, requireAuth, ensureUserId } from "./middleware/auth";
@@ -191,14 +191,37 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Stripe Checkout Routes
-  app.post("/api/create-checkout-session", async (req, res) => {
+  // Check if user has an active subscription
+  app.get("/api/subscription", requireAuth, ensureUserId, async (req, res) => {
     try {
+      const userId = req.userId;
+      const hasSubscription = await checkUserSubscription(userId);
+      res.json({ subscribed: hasSubscription });
+    } catch (error: any) {
+      console.error("Subscription check error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Stripe Checkout Routes - requires authentication
+  app.post("/api/create-checkout-session", requireAuth, ensureUserId, async (req, res) => {
+    try {
+      const userId = req.userId;
+      
+      // Check if the user already has an active subscription
+      const hasSubscription = await checkUserSubscription(userId);
+      if (hasSubscription) {
+        return res.status(400).json({ 
+          error: "You already have an active subscription",
+          subscribed: true
+        });
+      }
+      
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       const successUrl = `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
       const cancelUrl = `${baseUrl}/checkout/cancel`;
       
-      const session = await createCheckoutSession(successUrl, cancelUrl);
+      const session = await createCheckoutSession(successUrl, cancelUrl, userId);
       res.json({ url: session.url });
     } catch (error: any) {
       console.error("Checkout session error:", error);

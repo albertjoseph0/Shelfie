@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { SignedIn, SignedOut, useAuth, SignInButton } from "@clerk/clerk-react";
 import { Link } from "wouter";
@@ -23,7 +23,47 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const { isSignedIn } = useAuth();
   
+  // State to track subscription status
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
+  
+  // Check subscription status when user is signed in
+  useEffect(() => {
+    if (isSignedIn) {
+      checkSubscription();
+    }
+  }, [isSignedIn]);
+  
+  // Function to check if the user has an active subscription
+  const checkSubscription = async () => {
+    if (!isSignedIn) return;
+    
+    try {
+      setIsCheckingSubscription(true);
+      const response = await fetch('/api/subscription');
+      const data = await response.json();
+      setIsSubscribed(data.subscribed);
+    } catch (error) {
+      console.error('Error checking subscription:', error);
+    } finally {
+      setIsCheckingSubscription(false);
+    }
+  };
+  
+  // Function to handle the "Start Cataloging" button click
   const handleStartCataloging = async () => {
+    if (!isSignedIn) {
+      // If not signed in, we don't need this function
+      // The SignInButton component will handle opening the auth modal
+      return;
+    }
+    
+    // If already subscribed, no need to go to checkout
+    if (isSubscribed) {
+      // Just navigate to the library page or other action
+      return;
+    }
+    
     try {
       setIsLoading(true);
       const response = await fetch('/api/create-checkout-session', {
@@ -32,6 +72,17 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (errorData.subscribed) {
+          // User has subscription but our local state didn't catch it
+          setIsSubscribed(true);
+          setIsLoading(false);
+          return;
+        }
+        throw new Error(errorData.error || 'Failed to create checkout session');
+      }
       
       const { url } = await response.json();
       
@@ -76,21 +127,29 @@ export default function Home() {
                 more hassle.
               </p>
               <div className="pt-4">
-                <Button 
-                  size="lg" 
-                  className="text-lg px-8" 
-                  onClick={handleStartCataloging} 
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent"></span>
-                      Processing...
-                    </>
-                  ) : (
-                    'Start Cataloging'
-                  )}
-                </Button>
+                {isSignedIn ? (
+                  <Button 
+                    size="lg" 
+                    className="text-lg px-8" 
+                    onClick={handleStartCataloging} 
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent"></span>
+                        Processing...
+                      </>
+                    ) : (
+                      'Start Cataloging'
+                    )}
+                  </Button>
+                ) : (
+                  <SignInButton mode="modal">
+                    <Button size="lg" className="text-lg px-8">
+                      Sign In to Start
+                    </Button>
+                  </SignInButton>
+                )}
               </div>
             </div>
 
@@ -158,14 +217,22 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="mt-8">
-                  <Button 
-                    size="lg" 
-                    variant="default" 
-                    onClick={handleStartCataloging}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Processing..." : "Get Started"}
-                  </Button>
+                  {isSignedIn ? (
+                    <Button 
+                      size="lg" 
+                      variant="default" 
+                      onClick={handleStartCataloging}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Processing..." : "Get Started"}
+                    </Button>
+                  ) : (
+                    <SignInButton mode="modal">
+                      <Button size="lg" variant="default">
+                        Sign In to Get Started
+                      </Button>
+                    </SignInButton>
+                  )}
                 </div>
               </div>
             </div>
