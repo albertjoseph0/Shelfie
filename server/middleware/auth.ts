@@ -21,45 +21,18 @@ declare global {
   }
 }
 
-// Debug helper for authentication issues
-const logAuthError = (error: any, req: Request) => {
-  console.error('Authentication Error:', {
-    error: error.message,
-    path: req.path,
-    headers: {
-      authorization: req.headers.authorization ? 'present' : 'missing',
-      cookie: req.headers.cookie ? 'present' : 'missing'
-    },
-    clerk_key_present: !!process.env.CLERK_SECRET_KEY
-  });
-};
-
 // Middleware to extract userId and make it available in req
-export const extractUserId = ClerkExpressWithAuth({
-  onError: (error) => {
-    console.error('Error in extractUserId:', error);
-    // Continue even if auth fails - some routes are public
-    return null;
-  }
-});
+export const extractUserId = ClerkExpressWithAuth();
 
 // Middleware to require authentication for specific routes
-export const requireAuth = ClerkExpressRequireAuth({
-  onError: (error) => {
-    console.error('Error in requireAuth:', error);
-    throw error; // Let the global error handler deal with it
-  }
-});
+export const requireAuth = ClerkExpressRequireAuth();
 
 // Helper middleware to ensure userId exists and convert it to internal format
 export const ensureUserId = (req: Request, res: Response, next: NextFunction) => {
   const clerkUserId = req.auth?.userId;
 
   if (!clerkUserId) {
-    return res.status(401).json({ 
-      error: 'Authentication required',
-      message: "Please sign in to continue"
-    });
+    return res.status(401).json({ message: "Unauthorized" });
   }
 
   // Add userId to request object

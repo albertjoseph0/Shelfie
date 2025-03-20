@@ -9,10 +9,10 @@ export default function Navbar() {
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <Link href="/">
-            <div className="flex items-center space-x-2 cursor-pointer">
+            <a className="flex items-center space-x-2">
               <Book className="h-5 w-5 text-primary" />
               <span className="text-lg font-medium">Shelfie</span>
-            </div>
+            </a>
           </Link>
 
           <div className="flex items-center space-x-4">
@@ -21,7 +21,7 @@ export default function Navbar() {
             </SignedIn>
 
             <SignedOut>
-              <SignInButton mode="modal" afterSignInUrl="/subscribe">
+              <SignInButton mode="modal">
                 <Button variant="default" size="sm">Login</Button>
               </SignInButton>
             </SignedOut>
