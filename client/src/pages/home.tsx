@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { SignedIn, SignedOut, useAuth, SignInButton } from "@clerk/clerk-react";
+import { SignedIn, SignedOut, useAuth } from "@clerk/clerk-react";
 import { Link } from "wouter";
 import type { Book } from "@shared/schema";
 import UploadDialog from "@/components/upload-dialog";

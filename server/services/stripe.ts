@@ -19,7 +19,7 @@ export async function createCheckoutSession(successUrl: string, cancelUrl: strin
             product_data: {
               name: 'Shelfie Monthly Subscription',
               description: 'Catalog up to 50 books per month with Shelfie',
-              images: ['https://your-website.com/images/subscription-image.jpg'], // Replace with your image URL
+              images: [], // No image URL needed
             },
             unit_amount: 2000, // $20.00 in cents
             recurring: {
