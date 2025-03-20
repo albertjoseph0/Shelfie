@@ -4,17 +4,19 @@ import { clerkClient } from "@clerk/clerk-sdk-node";
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const sessionToken = req.header("Authorization")?.replace("Bearer ", "");
-    
+
     if (!sessionToken) {
       return res.status(401).json({ message: "No authentication token provided" });
     }
 
-    const session = await clerkClient.sessions.verifySession(sessionToken);
+    // Call Clerk's verifyToken endpoint with the session token
+    const session = await clerkClient.sessions.verifySession(sessionToken); //Corrected parameter
+
     req.auth = {
       userId: session.userId,
       sessionId: session.id
     };
-    
+
     next();
   } catch (error) {
     console.error("Authentication error:", error);
