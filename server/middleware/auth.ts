@@ -8,33 +8,37 @@ declare global {
       auth: {
         userId: string | null;
         sessionId: string | null;
-        orgId: string | null;
+        session: {
+          id: string;
+          status: string;
+          lastActiveAt: number;
+          expireAt: number;
+        } | null;
       }
     }
   }
 }
 
-// Middleware to extract userId and make it available in req
-export const extractUserId = ClerkExpressWithAuth({
-  jwtKey: process.env.CLERK_JWT_KEY,
-  secretKey: process.env.CLERK_SECRET_KEY,
-});
+// Middleware to extract userId and session info
+export const extractUserId = ClerkExpressWithAuth();
 
-// Middleware to require authentication for specific routes
-export const requireAuth = ClerkExpressRequireAuth({
-  jwtKey: process.env.CLERK_JWT_KEY,
-  secretKey: process.env.CLERK_SECRET_KEY,
-});
+// Middleware to require authentication and valid session
+export const requireAuth = ClerkExpressRequireAuth();
 
-// Helper middleware to ensure userId exists and convert it to internal format
+// Helper middleware to ensure userId exists and session is valid
 export const ensureUserId = (req: Request, res: Response, next: NextFunction) => {
   const clerkUserId = req.auth?.userId;
-  
-  if (!clerkUserId) {
+  const sessionId = req.auth?.sessionId;
+  const session = req.auth?.session;
+
+  if (!clerkUserId || !sessionId) {
     return res.status(401).json({ message: "Unauthorized" });
   }
-  
-  // You might want to transform the clerk user ID or perform additional validation
-  req.userId = clerkUserId;
+
+  // Check if session is expired
+  if (session && session.expireAt < Date.now()) {
+    return res.status(440).json({ message: "Session expired" });
+  }
+
   next();
 };
