@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer } from "http";
 import { storage } from "./storage";
+import { requireAuth, addUserToRequest } from "./middleware/auth";
 import { analyzeBookshelfImage } from "./services/openai";
 import { searchBook, getBookById } from "./services/google-books";
 import { insertBookSchema } from "@shared/schema";
@@ -8,7 +9,7 @@ import { nanoid } from "nanoid";
 
 export async function registerRoutes(app: Express) {
   // Get all books sorted by creation time (newest first)
-  app.get("/api/books", async (_req, res) => {
+  app.get("/api/books", requireAuth, addUserToRequest, async (_req, res) => {
     try {
       const books = await storage.getBooks();
       // Sort books by createdAt in descending order (newest first)
