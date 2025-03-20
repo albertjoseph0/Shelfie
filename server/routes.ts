@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer } from "http";
 import { storage } from "./storage";
 import { analyzeBookshelfImage } from "./services/openai";
@@ -6,6 +6,15 @@ import { searchBook, getBookById } from "./services/google-books";
 import { insertBookSchema } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { extractUserId, requireAuth, ensureUserId } from "./middleware/auth";
+
+// Extend Express Request to include userId
+declare global {
+  namespace Express {
+    interface Request {
+      userId: string;
+    }
+  }
+}
 
 export async function registerRoutes(app: Express) {
   // Add authentication middleware to all routes
@@ -17,7 +26,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Protected routes - all API endpoints that need auth
-  app.get("/api/books", requireAuth, ensureUserId, async (req, res) => {
+  app.get("/api/books", requireAuth, ensureUserId, async (req: Request, res) => {
     try {
       const books = await storage.getBooks(req.userId);
       books.sort((a, b) => {
@@ -25,15 +34,15 @@ export async function registerRoutes(app: Express) {
       });
       res.json(books);
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      const message = error instanceof Error ? error.message : 'An error occurred';
+      res.status(500).json({ message });
     }
   });
 
   // Export library as CSV - protected
-  app.get("/api/export", requireAuth, ensureUserId, async (req, res) => {
+  app.get("/api/export", requireAuth, ensureUserId, async (req: Request, res) => {
     try {
       const books = await storage.getBooks(req.userId);
-
       // Create CSV header
       const csvRows = [
         [
@@ -69,12 +78,13 @@ export async function registerRoutes(app: Express) {
       res.setHeader('Content-Disposition', 'attachment; filename=my-library.csv');
       res.send(csvRows.join("\n"));
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      const message = error instanceof Error ? error.message : 'An error occurred';
+      res.status(500).json({ message });
     }
   });
 
   // Book analysis and creation - protected
-  app.post("/api/analyze", requireAuth, ensureUserId, async (req, res) => {
+  app.post("/api/analyze", requireAuth, ensureUserId, async (req: Request, res) => {
     try {
       const { image } = req.body;
       if (!image) {
@@ -84,7 +94,7 @@ export async function registerRoutes(app: Express) {
       const uploadId = nanoid();
       const analysis = await analyzeBookshelfImage(image);
 
-      // Process books code remains similar but adds userId
+      // Process books
       const books = await Promise.all(
         analysis.books.map(async (book) => {
           const googleBooks = await searchBook(`${book.title} ${book.author || ''}`);
@@ -100,6 +110,8 @@ export async function registerRoutes(app: Express) {
             pageCount: bookInfo.pageCount,
             googleBooksId: googleBooks[0].id,
             createdAt: new Date().toISOString(),
+            userId: req.userId,
+            uploadId,
             metadata: {
               categories: bookInfo.categories,
               publishedDate: bookInfo.publishedDate,
@@ -113,7 +125,6 @@ export async function registerRoutes(app: Express) {
             return null;
           }
 
-          // Pass userId to createBook
           const savedBook = await storage.createBook(parsed.data, uploadId, req.userId);
           return savedBook;
         })
@@ -123,34 +134,37 @@ export async function registerRoutes(app: Express) {
       res.json({ books: validBooks, uploadId });
     } catch (error) {
       console.error("Error in /api/analyze:", error);
-      res.status(500).json({ message: error.message });
+      const message = error instanceof Error ? error.message : 'An error occurred';
+      res.status(500).json({ message });
     }
   });
 
   // Delete a single book - protected
-  app.delete("/api/books/:id", requireAuth, ensureUserId, async (req, res) => {
+  app.delete("/api/books/:id", requireAuth, ensureUserId, async (req: Request, res) => {
     try {
       const bookId = parseInt(req.params.id);
       await storage.deleteBook(bookId, req.userId);
       res.status(204).send();
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      const message = error instanceof Error ? error.message : 'An error occurred';
+      res.status(500).json({ message });
     }
   });
 
   // Undo an upload - protected
-  app.delete("/api/uploads/:uploadId", requireAuth, ensureUserId, async (req, res) => {
+  app.delete("/api/uploads/:uploadId", requireAuth, ensureUserId, async (req: Request, res) => {
     try {
       const { uploadId } = req.params;
       await storage.deleteBooksByUploadId(uploadId, req.userId);
       res.status(204).send();
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      const message = error instanceof Error ? error.message : 'An error occurred';
+      res.status(500).json({ message });
     }
   });
 
   // Get detailed book info - protected
-  app.get("/api/books/:id/details", requireAuth, ensureUserId, async (req, res) => {
+  app.get("/api/books/:id/details", requireAuth, ensureUserId, async (req: Request, res) => {
     try {
       const book = await storage.getBook(parseInt(req.params.id), req.userId);
       if (!book?.googleBooksId) {
@@ -160,7 +174,8 @@ export async function registerRoutes(app: Express) {
       const details = await getBookById(book.googleBooksId);
       res.json(details);
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      const message = error instanceof Error ? error.message : 'An error occurred';
+      res.status(500).json({ message });
     }
   });
 
