@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Navbar from "@/components/navbar";
-import { ClerkProvider, useAuth } from "@clerk/clerk-react";
+import { ClerkProvider } from "@clerk/clerk-react";
 import ProtectedRoute from "@/components/protected-route";
 
 if (!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY) {
