@@ -107,10 +107,6 @@ export default function Home() {
                     <span>Bank-level security for your library</span>
                   </div>
                   <div className="flex items-center gap-2 justify-center">
-                    <Database className="h-5 w-5 text-primary" />
-                    <span>Unlimited books in your collection</span>
-                  </div>
-                  <div className="flex items-center gap-2 justify-center">
                     <Download className="h-5 w-5 text-primary" />
                     <span>Download your library anytime</span>
                   </div>
