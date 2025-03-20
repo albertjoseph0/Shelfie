@@ -1,0 +1,139 @@
+The first solution is simpler, as it modifies the existing code rather than creating new files and routes. Here's an implementation plan:
+
+# Implementation Plan: Enhanced Authentication-to-Checkout Flow
+
+## 1. Update useEffect in home.tsx
+
+**File**: `client/src/pages/home.tsx`
+
+**Changes**:
+- Modify the useEffect that watches for authentication changes
+- Add logic to check subscription and trigger checkout when needed
+
+## 2. Update handleStartCataloging in home.tsx
+
+**File**: `client/src/pages/home.tsx`
+
+**Changes**:
+- Simplify the function to avoid double-checking subscription
+- Focus on just creating the checkout session
+
+## 3. Implementation Steps:
+
+1. Open `client/src/pages/home.tsx`
+
+2. Find the existing useEffect that watches for login state:
+   ```typescript
+   useEffect(() => {
+     if (isSignedIn) {
+       checkSubscription();
+     } else {
+       // Reset subscription state when signed out
+       setIsSubscribed(false);
+       setIsCheckingSubscription(false);
+     }
+   }, [isSignedIn]);
+   ```
+
+3. Replace it with the enhanced version:
+   ```typescript
+   useEffect(() => {
+     if (isSignedIn) {
+       // Check subscription first
+       const checkAndRedirect = async () => {
+         setIsCheckingSubscription(true);
+         try {
+           const response = await fetch('/api/subscription');
+           
+           if (!response.ok) {
+             throw new Error('Failed to check subscription status');
+           }
+           
+           const data = await response.json();
+           console.log('Subscription check:', data);
+           setIsSubscribed(data.subscribed);
+           
+           // If this appears to be right after login (determined by URL params or state)
+           // we can auto-redirect based on subscription status
+           const urlParams = new URLSearchParams(window.location.search);
+           if (urlParams.has('post_auth') || sessionStorage.getItem('post_auth')) {
+             sessionStorage.removeItem('post_auth'); // Clear flag if using that approach
+             
+             if (data.subscribed) {
+               // Already subscribed, go to library
+               window.location.href = '/library';
+             } else {
+               // Not subscribed, trigger checkout
+               handleStartCataloging();
+             }
+           }
+         } catch (error) {
+           console.error('Error checking subscription:', error);
+         } finally {
+           setIsCheckingSubscription(false);
+         }
+       };
+       
+       checkAndRedirect();
+     } else {
+       // Reset subscription state when signed out
+       setIsSubscribed(false);
+       setIsCheckingSubscription(false);
+     }
+   }, [isSignedIn]);
+   ```
+
+4. Modify the `handleStartCataloging` function:
+   ```typescript
+   const handleStartCataloging = async () => {
+     if (!isSignedIn) {
+       // If not signed in, store a flag to indicate that we should
+       // trigger checkout flow after auth
+       sessionStorage.setItem('post_auth', 'true');
+       return; // SignInButton will handle opening the auth modal
+     }
+     
+     // If already subscribed, redirect to the library page
+     if (isSubscribed) {
+       window.location.href = '/library';
+       return;
+     }
+     
+     try {
+       setIsLoading(true);
+       console.log('Creating checkout session...');
+       
+       const response = await fetch('/api/create-checkout-session', {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+         },
+       });
+       
+       // Rest of the function remains the same...
+     } catch (error) {
+       console.error('Checkout error:', error);
+       setIsLoading(false);
+     }
+   };
+   ```
+
+5. Update the SignInButton component to include a query parameter for post-auth redirection:
+   ```tsx
+   <SignInButton mode="modal" afterSignInUrl="/?post_auth=true">
+     <Button size="lg" className="text-lg px-8">
+       Sign In to Start
+     </Button>
+   </SignInButton>
+   ```
+
+## 4. Test the Flow:
+
+1. Sign out completely
+2. Click "Sign In to Start"
+3. Complete the authentication 
+4. You should be automatically redirected to:
+   - Library page if already subscribed
+   - Stripe checkout if not subscribed
+
+This plan enhances the existing code without adding new pages or routes, making it the simpler solution to implement.

@@ -30,7 +30,42 @@ export default function Home() {
   // Check subscription status when user is signed in
   useEffect(() => {
     if (isSignedIn) {
-      checkSubscription();
+      // Check subscription first
+      const checkAndRedirect = async () => {
+        setIsCheckingSubscription(true);
+        try {
+          const response = await fetch('/api/subscription');
+          
+          if (!response.ok) {
+            throw new Error('Failed to check subscription status');
+          }
+          
+          const data = await response.json();
+          console.log('Subscription check:', data);
+          setIsSubscribed(data.subscribed);
+          
+          // If this appears to be right after login (determined by URL params or state)
+          // we can auto-redirect based on subscription status
+          const urlParams = new URLSearchParams(window.location.search);
+          if (urlParams.has('post_auth') || sessionStorage.getItem('post_auth')) {
+            sessionStorage.removeItem('post_auth'); // Clear flag if using that approach
+            
+            if (data.subscribed) {
+              // Already subscribed, go to library
+              window.location.href = '/library';
+            } else {
+              // Not subscribed, trigger checkout
+              handleStartCataloging();
+            }
+          }
+        } catch (error) {
+          console.error('Error checking subscription:', error);
+        } finally {
+          setIsCheckingSubscription(false);
+        }
+      };
+      
+      checkAndRedirect();
     } else {
       // Reset subscription state when signed out
       setIsSubscribed(false);
@@ -38,38 +73,14 @@ export default function Home() {
     }
   }, [isSignedIn]);
   
-  // Function to check if the user has an active subscription
-  const checkSubscription = async () => {
-    if (!isSignedIn) return;
-    
-    try {
-      setIsCheckingSubscription(true);
-      const response = await fetch('/api/subscription');
-      
-      if (!response.ok) {
-        throw new Error('Failed to check subscription status');
-      }
-      
-      const data = await response.json();
-      console.log('Subscription check:', data);
-      setIsSubscribed(data.subscribed);
-    } catch (error) {
-      console.error('Error checking subscription:', error);
-    } finally {
-      setIsCheckingSubscription(false);
-    }
-  };
-  
   // Function to handle the "Start Cataloging" button click
   const handleStartCataloging = async () => {
     if (!isSignedIn) {
-      // If not signed in, we don't need this function
-      // SignInButton component will handle opening the auth modal
-      return;
+      // If not signed in, store a flag to indicate that we should
+      // trigger checkout flow after auth
+      sessionStorage.setItem('post_auth', 'true');
+      return; // SignInButton will handle opening the auth modal
     }
-    
-    // Re-check subscription status first
-    await checkSubscription();
     
     // If already subscribed, redirect to the library page
     if (isSubscribed) {
