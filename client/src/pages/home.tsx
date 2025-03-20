@@ -20,7 +20,28 @@ import {
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const { isSignedIn } = useAuth();
+  
+  const handleStartCataloging = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const { url } = await response.json();
+      
+      // Redirect to Stripe Checkout
+      window.location.href = url;
+    } catch (error) {
+      console.error('Checkout error:', error);
+      setIsLoading(false);
+    }
+  };
 
   const { data: books = [] } = useQuery<Book[]>({
     queryKey: ["/api/books"],
@@ -55,11 +76,21 @@ export default function Home() {
                 more hassle.
               </p>
               <div className="pt-4">
-                <SignInButton mode="modal">
-                  <Button size="lg" className="text-lg px-8">
-                    Start Cataloging
-                  </Button>
-                </SignInButton>
+                <Button 
+                  size="lg" 
+                  className="text-lg px-8" 
+                  onClick={handleStartCataloging} 
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent"></span>
+                      Processing...
+                    </>
+                  ) : (
+                    'Start Cataloging'
+                  )}
+                </Button>
               </div>
             </div>
 
@@ -127,11 +158,14 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="mt-8">
-                  <SignInButton mode="modal">
-                    <Button size="lg" variant="default">
-                      Start Cataloging
-                    </Button>
-                  </SignInButton>
+                  <Button 
+                    size="lg" 
+                    variant="default" 
+                    onClick={handleStartCataloging}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Processing..." : "Get Started"}
+                  </Button>
                 </div>
               </div>
             </div>

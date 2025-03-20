@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
+import CheckoutSuccess from "@/pages/checkout-success";
+import CheckoutCancel from "@/pages/checkout-cancel";
 import Navbar from "@/components/navbar";
 
 // Auth protection component
@@ -24,6 +26,10 @@ function Router() {
     <Switch>
       {/* Public landing page */}
       <Route path="/" component={Home} />
+
+      {/* Checkout routes */}
+      <Route path="/checkout/success" component={CheckoutSuccess} />
+      <Route path="/checkout/cancel" component={CheckoutCancel} />
 
       {/* Protected routes */}
       <Route path="/library">
