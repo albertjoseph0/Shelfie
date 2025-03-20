@@ -25,10 +25,7 @@ declare global {
 export const extractUserId = ClerkExpressWithAuth();
 
 // Middleware to require authentication for specific routes
-export const requireAuth = ClerkExpressRequireAuth({
-  // Options can be configured here, but don't use onError as it doesn't
-  // take the expected parameters in the current Clerk SDK version
-});
+export const requireAuth = ClerkExpressRequireAuth();
 
 // Helper middleware to ensure userId exists and convert it to internal format
 export const ensureUserId = (req: Request, res: Response, next: NextFunction) => {

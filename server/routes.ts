@@ -1,10 +1,8 @@
 import type { Express } from "express";
 import { createServer } from "http";
-import express from "express";
 import { storage } from "./storage";
 import { analyzeBookshelfImage } from "./services/openai";
 import { searchBook, getBookById } from "./services/google-books";
-import { createCheckoutSession, handleWebhookEvent, checkUserSubscription } from "./services/stripe";
 import { insertBookSchema } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { extractUserId, requireAuth, ensureUserId } from "./middleware/auth";
@@ -19,31 +17,16 @@ export async function registerRoutes(app: Express) {
     res.json({ status: "ok" });
   });
 
-  // Books endpoint - returns empty array if not authenticated
-  app.get("/api/books", extractUserId, async (req, res) => {
+  // Protected routes - all API endpoints that need auth
+  app.get("/api/books", requireAuth, ensureUserId, async (req, res) => {
     try {
-      // Check if user is authenticated
-      const userId = req.auth?.userId;
-      
-      if (!userId) {
-        // Return empty array if not authenticated
-        return res.json([]);
-      }
-      
-      // Add userId to req for storage function
-      req.userId = userId;
-      
-      const books = await storage.getBooks(userId);
+      const books = await storage.getBooks(req.userId);
       books.sort((a, b) => {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
       res.json(books);
-    } catch (error: any) {
-      console.error("Error fetching books:", error);
-      res.status(500).json({ 
-        success: false,
-        message: error.message || "Error fetching books" 
-      });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
     }
   });
 
@@ -203,100 +186,6 @@ export async function registerRoutes(app: Express) {
       res.json(details);
     } catch (error) {
       res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Check if user has an active subscription
-  app.get("/api/subscription", extractUserId, async (req, res) => {
-    try {
-      const userId = req.auth?.userId;
-      
-      if (!userId) {
-        // If not authenticated, user has no subscription
-        return res.json({ subscribed: false });
-      }
-      
-      const hasSubscription = await checkUserSubscription(userId);
-      res.json({ subscribed: hasSubscription });
-    } catch (error: any) {
-      console.error("Subscription check error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Stripe Checkout Routes - requires authentication
-  app.post("/api/create-checkout-session", extractUserId, async (req, res) => {
-    try {
-      const userId = req.auth?.userId;
-      
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false,
-          message: "Authentication required" 
-        });
-      }
-      
-      console.log("Creating checkout session for userId:", userId);
-      
-      // Check if the user already has an active subscription
-      const hasSubscription = await checkUserSubscription(userId);
-      if (hasSubscription) {
-        return res.status(400).json({ 
-          success: false,
-          error: "You already have an active subscription",
-          subscribed: true
-        });
-      }
-      
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const successUrl = `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl = `${baseUrl}/checkout/cancel`;
-      
-      console.log("Creating Stripe checkout session with success URL:", successUrl);
-      
-      const session = await createCheckoutSession(successUrl, cancelUrl, userId);
-      
-      if (!session.url) {
-        throw new Error("No checkout URL returned from Stripe");
-      }
-      
-      console.log("Checkout session created, redirecting to:", session.url);
-      
-      res.json({ 
-        success: true,
-        url: session.url 
-      });
-    } catch (error: any) {
-      console.error("Checkout session error:", error);
-      res.status(500).json({ 
-        success: false,
-        message: error.message || "Failed to create checkout session" 
-      });
-    }
-  });
-
-  // Add a raw body parser middleware for Stripe webhooks
-  const stripeWebhookMiddleware = express.raw({ type: 'application/json' });
-
-  app.post("/api/webhook", stripeWebhookMiddleware, async (req, res) => {
-    try {
-      // Check if stripe-signature header exists
-      const signature = req.headers['stripe-signature'];
-      if (!signature) {
-        return res.status(400).json({ 
-          success: false,
-          message: "Missing stripe-signature header" 
-        });
-      }
-      
-      const result = await handleWebhookEvent(req.body, signature as string);
-      res.json({ success: true, ...result });
-    } catch (error: any) {
-      console.error("Webhook error:", error);
-      res.status(400).json({ 
-        success: false,
-        message: error.message || "Unknown webhook error"
-      });
     }
   });
 

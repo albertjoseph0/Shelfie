@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { SignedIn, SignedOut, useAuth, SignInButton } from "@clerk/clerk-react";
 import { Link } from "wouter";
@@ -20,115 +20,7 @@ import {
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const { isSignedIn } = useAuth();
-  
-  // State to track subscription status
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
-  
-  // Check subscription status when user is signed in
-  useEffect(() => {
-    if (isSignedIn) {
-      // Check subscription first
-      const checkAndRedirect = async () => {
-        setIsCheckingSubscription(true);
-        try {
-          const response = await fetch('/api/subscription');
-          
-          if (!response.ok) {
-            throw new Error('Failed to check subscription status');
-          }
-          
-          const data = await response.json();
-          console.log('Subscription check:', data);
-          setIsSubscribed(data.subscribed);
-          
-          // If this appears to be right after login (determined by URL params or state)
-          // we can auto-redirect based on subscription status
-          const urlParams = new URLSearchParams(window.location.search);
-          if (urlParams.has('post_auth') || sessionStorage.getItem('post_auth')) {
-            sessionStorage.removeItem('post_auth'); // Clear flag if using that approach
-            
-            if (data.subscribed) {
-              // Already subscribed, go to library
-              window.location.href = '/library';
-            } else {
-              // Not subscribed, trigger checkout
-              handleStartCataloging();
-            }
-          }
-        } catch (error) {
-          console.error('Error checking subscription:', error);
-        } finally {
-          setIsCheckingSubscription(false);
-        }
-      };
-      
-      checkAndRedirect();
-    } else {
-      // Reset subscription state when signed out
-      setIsSubscribed(false);
-      setIsCheckingSubscription(false);
-    }
-  }, [isSignedIn]);
-  
-  // Function to handle the "Start Cataloging" button click
-  const handleStartCataloging = async () => {
-    if (!isSignedIn) {
-      // If not signed in, store a flag to indicate that we should
-      // trigger checkout flow after auth
-      sessionStorage.setItem('post_auth', 'true');
-      return; // SignInButton will handle opening the auth modal
-    }
-    
-    // If already subscribed, redirect to the library page
-    if (isSubscribed) {
-      window.location.href = '/library';
-      return;
-    }
-    
-    try {
-      setIsLoading(true);
-      console.log('Creating checkout session...');
-      
-      const response = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      console.log('Checkout response status:', response.status);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.log('Checkout error response:', errorData);
-        
-        if (errorData.subscribed) {
-          // User has subscription but our local state didn't catch it
-          setIsSubscribed(true);
-          setIsLoading(false);
-          window.location.href = '/library';
-          return;
-        }
-        throw new Error(errorData.error || 'Failed to create checkout session');
-      }
-      
-      const data = await response.json();
-      console.log('Checkout response data:', data);
-      
-      if (data.url) {
-        // Redirect to Stripe Checkout
-        window.location.href = data.url;
-      } else {
-        throw new Error('No checkout URL returned');
-      }
-    } catch (error) {
-      console.error('Checkout error:', error);
-      setIsLoading(false);
-    }
-  };
 
   const { data: books = [] } = useQuery<Book[]>({
     queryKey: ["/api/books"],
@@ -163,29 +55,11 @@ export default function Home() {
                 more hassle.
               </p>
               <div className="pt-4">
-                {isSignedIn ? (
-                  <Button 
-                    size="lg" 
-                    className="text-lg px-8" 
-                    onClick={handleStartCataloging} 
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent"></span>
-                        Processing...
-                      </>
-                    ) : (
-                      'Start Cataloging'
-                    )}
+                <SignInButton mode="modal">
+                  <Button size="lg" className="text-lg px-8">
+                    Start Cataloging
                   </Button>
-                ) : (
-                  <SignInButton mode="modal">
-                    <Button size="lg" className="text-lg px-8">
-                      Sign In to Start
-                    </Button>
-                  </SignInButton>
-                )}
+                </SignInButton>
               </div>
             </div>
 
@@ -253,22 +127,11 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="mt-8">
-                  {isSignedIn ? (
-                    <Button 
-                      size="lg" 
-                      variant="default" 
-                      onClick={handleStartCataloging}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? "Processing..." : "Get Started"}
+                  <SignInButton mode="modal">
+                    <Button size="lg" variant="default">
+                      Start Cataloging
                     </Button>
-                  ) : (
-                    <SignInButton mode="modal">
-                      <Button size="lg" variant="default">
-                        Sign In to Get Started
-                      </Button>
-                    </SignInButton>
-                  )}
+                  </SignInButton>
                 </div>
               </div>
             </div>
