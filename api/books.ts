@@ -1,9 +1,9 @@
-import { NextApiRequest, NextApiResponse } from '@vercel/node';
+import { VercelRequest, VercelResponse } from './types';
 import { storage } from '../server/storage';
 import { requireAuth, ensureUserId } from '../server/middleware/auth';
 import { getBookById } from '../server/services/google-books';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Apply authentication middleware
   try {
     await new Promise((resolve, reject) => {
@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         else resolve(null);
       });
     });
-    
+
     await new Promise((resolve, reject) => {
       ensureUserId(req, res, (err) => {
         if (err) reject(err);
@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Handle different HTTP methods
   if (req.method === 'GET') {
     const { id } = req.query;
-    
+
     try {
       if (id) {
         // Get single book details
@@ -57,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ message: error.message });
     }
   }
-  
+
   // Method not allowed
   return res.status(405).json({ message: "Method not allowed" });
 }
