@@ -36,22 +36,18 @@ const logAuthError = (error: any, req: Request) => {
 
 // Middleware to extract userId and make it available in req
 export const extractUserId = ClerkExpressWithAuth({
-  onError: (err, req, res) => {
-    logAuthError(err, req);
+  onError: (error) => {
+    console.error('Error in extractUserId:', error);
     // Continue even if auth fails - some routes are public
-    req.auth = { userId: null, sessionId: null, orgId: null };
-    return;
+    return null;
   }
 });
 
 // Middleware to require authentication for specific routes
 export const requireAuth = ClerkExpressRequireAuth({
-  onError: (err, req, res) => {
-    logAuthError(err, req);
-    return res.status(401).json({
-      error: 'Authentication required',
-      message: 'Please sign in to access this resource'
-    });
+  onError: (error) => {
+    console.error('Error in requireAuth:', error);
+    throw error; // Let the global error handler deal with it
   }
 });
 
