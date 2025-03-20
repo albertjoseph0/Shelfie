@@ -84,6 +84,7 @@ export async function registerRoutes(app: Express) {
       const uploadId = nanoid();
       const analysis = await analyzeBookshelfImage(image);
 
+      // Process books code remains similar but adds userId
       const books = await Promise.all(
         analysis.books.map(async (book) => {
           const googleBooks = await searchBook(`${book.title} ${book.author || ''}`);
@@ -112,6 +113,7 @@ export async function registerRoutes(app: Express) {
             return null;
           }
 
+          // Pass userId to createBook
           const savedBook = await storage.createBook(parsed.data, uploadId, req.userId);
           return savedBook;
         })

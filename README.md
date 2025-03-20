@@ -19,6 +19,7 @@ Shelfie is a modern web application that makes cataloging your physical book col
 - **Authentication**: Clerk
 - **API Integration**: Google Books API
 - **Image Analysis**: OpenAI GPT-4 Vision
+- **Database**: PostgreSQL with Drizzle ORM
 - **State Management**: TanStack Query
 
 ## 🛠️ Setup
@@ -26,7 +27,8 @@ Shelfie is a modern web application that makes cataloging your physical book col
 ### Prerequisites
 
 1. Node.js 18+ installed
-2. API Keys:
+2. PostgreSQL database
+3. API Keys:
    - Clerk (Authentication)
    - OpenAI (Image Analysis)
    - Google Books API
@@ -43,6 +45,9 @@ CLERK_SECRET_KEY=your_secret_key
 # APIs
 OPENAI_API_KEY=your_openai_key
 GOOGLE_BOOKS_API_KEY=your_google_books_key
+
+# Database
+DATABASE_URL=your_postgresql_url
 ```
 
 ### Installation
