@@ -1,3 +1,9 @@
+// WARNING: This is an in-memory storage implementation for development.
+// For production deployment on Vercel:
+// 1. Functions are stateless and don't maintain memory between executions
+// 2. Multiple function instances might run simultaneously
+// TODO: Replace with a persistent database solution before deploying to production
+
 import type { Book, InsertBook } from "@shared/schema";
 
 export interface IStorage {
@@ -70,7 +76,7 @@ export class MemStorage implements IStorage {
     const lowercaseQuery = query.toLowerCase();
     return Array.from(this.books.values())
       .filter(book => book.userId === userId)
-      .filter(book => 
+      .filter(book =>
         book.title.toLowerCase().includes(lowercaseQuery) ||
         book.author.toLowerCase().includes(lowercaseQuery)
       );

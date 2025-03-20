@@ -1,7 +1,7 @@
 import './types';
 import express from 'express';
 import serverless from 'serverless-http';
-import { extractUserId, requireAuth, ensureUserId } from '../server/middleware/auth';
+import { extractUserId } from '../server/middleware/auth';
 import { storage } from '../server/storage';
 import { analyzeBookshelfImage } from '../server/services/openai';
 import { searchBook, getBookById } from '../server/services/google-books';
@@ -16,12 +16,12 @@ app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 app.use(extractUserId);
 
 // Health check endpoint
-app.get('/api/health', (_req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
 // Books endpoint
-app.get('/api/books', requireAuth, ensureUserId, async (req, res) => {
+app.get('/books', async (req, res) => {
   try {
     const books = await storage.getBooks(req.userId);
     books.sort((a, b) => {
@@ -34,7 +34,7 @@ app.get('/api/books', requireAuth, ensureUserId, async (req, res) => {
 });
 
 // Export endpoint
-app.get('/api/export', requireAuth, ensureUserId, async (req, res) => {
+app.get('/export', async (req, res) => {
   try {
     const books = await storage.getBooks(req.userId);
     const csvRows = [
@@ -75,7 +75,7 @@ app.get('/api/export', requireAuth, ensureUserId, async (req, res) => {
 });
 
 // Analyze endpoint
-app.post('/api/analyze', requireAuth, ensureUserId, async (req, res) => {
+app.post('/analyze', async (req, res) => {
   try {
     const { image } = req.body;
     if (!image) {
@@ -115,13 +115,13 @@ app.post('/api/analyze', requireAuth, ensureUserId, async (req, res) => {
     const validBooks = books.filter(Boolean);
     res.json({ books: validBooks, uploadId });
   } catch (error) {
-    console.error("Error in /api/analyze:", error);
+    console.error("Error in /analyze:", error);
     res.status(500).json({ message: error.message });
   }
 });
 
 // Delete book endpoint
-app.delete('/api/books/:id', requireAuth, ensureUserId, async (req, res) => {
+app.delete('/books/:id', async (req, res) => {
   try {
     const bookId = parseInt(req.params.id);
     await storage.deleteBook(bookId, req.userId);
@@ -132,7 +132,7 @@ app.delete('/api/books/:id', requireAuth, ensureUserId, async (req, res) => {
 });
 
 // Undo upload endpoint
-app.delete('/api/uploads/:uploadId', requireAuth, ensureUserId, async (req, res) => {
+app.delete('/uploads/:uploadId', async (req, res) => {
   try {
     const { uploadId } = req.params;
     await storage.deleteBooksByUploadId(uploadId, req.userId);
@@ -143,7 +143,7 @@ app.delete('/api/uploads/:uploadId', requireAuth, ensureUserId, async (req, res)
 });
 
 // Book details endpoint
-app.get('/api/books/:id/details', requireAuth, ensureUserId, async (req, res) => {
+app.get('/books/:id/details', async (req, res) => {
   try {
     const book = await storage.getBook(parseInt(req.params.id), req.userId);
     if (!book?.googleBooksId) {
