@@ -16,31 +16,26 @@ declare global {
         sessionId: string | null;
         orgId: string | null;
       }
+      userId?: string; // Add userId to Request type
     }
   }
 }
 
 // Middleware to extract userId and make it available in req
-export const extractUserId = ClerkExpressWithAuth({
-  jwtKey: process.env.CLERK_JWT_KEY,
-  secretKey: process.env.CLERK_SECRET_KEY,
-});
+export const extractUserId = ClerkExpressWithAuth();
 
 // Middleware to require authentication for specific routes
-export const requireAuth = ClerkExpressRequireAuth({
-  jwtKey: process.env.CLERK_JWT_KEY,
-  secretKey: process.env.CLERK_SECRET_KEY,
-});
+export const requireAuth = ClerkExpressRequireAuth();
 
 // Helper middleware to ensure userId exists and convert it to internal format
 export const ensureUserId = (req: Request, res: Response, next: NextFunction) => {
   const clerkUserId = req.auth?.userId;
-  
+
   if (!clerkUserId) {
     return res.status(401).json({ message: "Unauthorized" });
   }
-  
-  // You might want to transform the clerk user ID or perform additional validation
+
+  // Add userId to request object
   req.userId = clerkUserId;
   next();
 };
