@@ -1,6 +1,26 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import dotenv from "dotenv";
+
+// Load environment variables from the appropriate .env file
+const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development';
+console.log(`Loading environment from ${envFile}`);
+dotenv.config({ path: envFile });
+
+// Check for required environment variables
+const requiredEnvVars = [
+  'CLERK_SECRET_KEY',
+  'VITE_CLERK_PUBLISHABLE_KEY',
+  'OPENAI_API_KEY',
+  'GOOGLE_BOOKS_API_KEY'
+];
+
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingEnvVars.length > 0) {
+  console.error('Missing required environment variables:', missingEnvVars.join(', '));
+  process.exit(1);
+}
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -37,6 +57,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  console.log('Initializing server...');
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -51,21 +72,26 @@ app.use((req, res, next) => {
     }
 
     res.status(status).json({ message });
-    throw err;
+    console.error('Error:', err);
   });
 
   if (app.get("env") === "development") {
+    console.log('Starting in development mode with Vite middleware');
     await setupVite(app, server);
   } else {
+    console.log('Starting in production mode with static file serving');
     serveStatic(app);
   }
 
-  const port = 5000;
+  const port = process.env.PORT || 5000;
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
-    log(`serving on port ${port}`);
+    log(`Server started and listening on port ${port}`);
   });
-})();
+})().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});
