@@ -9,8 +9,15 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return res.status(401).json({ message: "No authentication token provided" });
     }
 
-    // Call Clerk's verifyToken endpoint with the session token
-    const session = await clerkClient.sessions.verifySession(sessionToken); //Corrected parameter
+    // Verify the session token using Clerk
+    const sessions = await clerkClient.sessions.getSessionList({
+      status: "active",
+    });
+    const session = sessions.find(s => s.id === sessionToken);
+
+    if (!session) {
+      return res.status(401).json({ message: "Invalid or expired session" });
+    }
 
     req.auth = {
       userId: session.userId,
