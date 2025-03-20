@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { SignedIn, SignedOut, useAuth } from '@clerk/clerk-react';
+import { SignedIn, SignedOut, useAuth, SignInButton } from '@clerk/clerk-react';
 import UploadDialog from "@/components/upload-dialog";
 import BookGrid from "@/components/book-grid";
 import { Input } from "@/components/ui/input";
@@ -41,9 +41,11 @@ export default function Home() {
               Simply snap a photo of your bookshelf and watch as AI identifies and catalogs your entire collection. No more manual entry, no more hassle.
             </p>
             <div className="pt-4">
-              <Button size="lg" className="text-lg px-8">
-                Start Cataloging
-              </Button>
+              <SignInButton mode="modal">
+                <Button size="lg" className="text-lg px-8">
+                  Start Cataloging
+                </Button>
+              </SignInButton>
             </div>
           </div>
 

@@ -22,7 +22,7 @@ export default function Navbar() {
 
             <SignedOut>
               <SignInButton mode="modal">
-                <Button variant="default" size="sm">Start Free</Button>
+                <Button variant="default" size="sm">Login</Button>
               </SignInButton>
             </SignedOut>
           </div>
