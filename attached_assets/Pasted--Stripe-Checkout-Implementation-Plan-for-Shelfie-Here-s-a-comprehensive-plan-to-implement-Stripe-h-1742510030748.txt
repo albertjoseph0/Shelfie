@@ -1,0 +1,391 @@
+# Stripe Checkout Implementation Plan for Shelfie
+
+Here's a comprehensive plan to implement Stripe hosted checkout for the Shelfie app, with specific steps and file modifications needed.
+
+## 1. Server-Side Implementation
+
+### Step 1: Install Stripe dependencies
+
+```bash
+npm install stripe
+```
+
+### Step 2: Create Stripe service file
+
+Create a new file: `server/services/stripe.ts`
+
+```typescript
+import Stripe from 'stripe';
+
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error("STRIPE_SECRET_KEY environment variable is required");
+}
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2023-10-16' // Use the latest API version
+});
+
+export async function createCheckoutSession(successUrl: string, cancelUrl: string) {
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Shelfie Monthly Subscription',
+              description: 'Catalog up to 50 books per month with Shelfie',
+              images: ['https://your-website.com/images/subscription-image.jpg'], // Replace with your image URL
+            },
+            unit_amount: 2000, // $20.00 in cents
+            recurring: {
+              interval: 'month',
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'subscription',
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+    });
+    
+    return session;
+  } catch (error) {
+    console.error('Error creating checkout session:', error);
+    throw error;
+  }
+}
+
+export async function handleWebhookEvent(payload: any, signature: string) {
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  
+  if (!webhookSecret) {
+    throw new Error("STRIPE_WEBHOOK_SECRET environment variable is required");
+  }
+
+  try {
+    const event = stripe.webhooks.constructEvent(
+      payload,
+      signature,
+      webhookSecret
+    );
+
+    switch (event.type) {
+      case 'checkout.session.completed':
+        // Handle successful checkout
+        const session = event.data.object;
+        // Store customer info, activate subscription, etc.
+        console.log(`Payment succeeded for session: ${session.id}`);
+        break;
+      case 'customer.subscription.deleted':
+        // Handle subscription cancellation
+        const subscription = event.data.object;
+        console.log(`Subscription ${subscription.id} was cancelled`);
+        break;
+      // Add other webhook handlers as needed
+    }
+
+    return { received: true };
+  } catch (error) {
+    console.error('Webhook error:', error);
+    throw error;
+  }
+}
+```
+
+### Step 3: Add Stripe endpoints to routes.ts
+
+Modify `server/routes.ts` to add the Stripe-related endpoints:
+
+```typescript
+// Import the Stripe service
+import { createCheckoutSession, handleWebhookEvent } from "./services/stripe";
+
+// Add these routes to the registerRoutes function
+app.post("/api/create-checkout-session", async (req, res) => {
+  try {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const successUrl = `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${baseUrl}/checkout/cancel`;
+    
+    const session = await createCheckoutSession(successUrl, cancelUrl);
+    res.json({ url: session.url });
+  } catch (error) {
+    console.error("Checkout session error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add a raw body parser middleware for Stripe webhooks
+const stripeWebhookMiddleware = express.raw({ type: 'application/json' });
+
+app.post("/api/webhook", stripeWebhookMiddleware, async (req, res) => {
+  try {
+    const signature = req.headers['stripe-signature'] as string;
+    const result = await handleWebhookEvent(req.body, signature);
+    res.json(result);
+  } catch (error) {
+    console.error("Webhook error:", error);
+    res.status(400).json({ error: error.message });
+  }
+});
+```
+
+### Step 4: Update environment variables
+
+Add the following to both `.env.development` and `.env.production`:
+
+```
+STRIPE_SECRET_KEY=sk_test_your_test_key
+STRIPE_PUBLISHABLE_KEY=pk_test_your_test_key
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+```
+
+## 2. Client-Side Implementation
+
+### Step 1: Create checkout pages
+
+Create `client/src/pages/checkout-success.tsx`:
+
+```typescript
+import { useEffect, useState } from "react";
+import { useLocation, Link } from "wouter";
+import { Book } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useClerk } from "@clerk/clerk-react";
+
+export default function CheckoutSuccess() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [_, setLocation] = useLocation();
+  const { openSignUp } = useClerk();
+  
+  // Get session_id from URL
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get('session_id');
+
+  useEffect(() => {
+    if (!sessionId) {
+      setError("Invalid checkout session");
+      setLoading(false);
+      return;
+    }
+    
+    // You could verify the session with your backend here
+    // For now, we'll just simulate a successful verification
+    setTimeout(() => {
+      setLoading(false);
+    }, 1000);
+  }, [sessionId]);
+
+  const handleContinue = () => {
+    // Open Clerk signup modal
+    openSignUp();
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 gap-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <p className="text-lg">Verifying your payment...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 gap-4">
+        <div className="text-red-500 text-xl">Error: {error}</div>
+        <Button asChild variant="outline">
+          <Link href="/">Return to Home</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 space-y-8">
+      <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-100">
+        <Book className="h-8 w-8 text-green-600" />
+      </div>
+      
+      <div className="text-center">
+        <h2 className="mt-6 text-3xl font-bold tracking-tight">
+          Payment Successful!
+        </h2>
+        <p className="mt-2 text-lg text-gray-600">
+          Thank you for subscribing to Shelfie. You're just one step away from digitizing your book collection.
+        </p>
+      </div>
+      
+      <div className="mt-8 space-y-4 w-full max-w-md">
+        <Button 
+          onClick={handleContinue} 
+          className="w-full"
+          size="lg"
+        >
+          Create Your Account
+        </Button>
+        
+        <Button asChild variant="outline" className="w-full">
+          <Link href="/">Return to Home</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+```
+
+Create `client/src/pages/checkout-cancel.tsx`:
+
+```typescript
+import { Link } from "wouter";
+import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+export default function CheckoutCancel() {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 space-y-8">
+      <div className="flex items-center justify-center w-16 h-16 rounded-full bg-red-100">
+        <AlertCircle className="h-8 w-8 text-red-600" />
+      </div>
+      
+      <div className="text-center">
+        <h2 className="mt-6 text-3xl font-bold tracking-tight">
+          Payment Cancelled
+        </h2>
+        <p className="mt-2 text-lg text-gray-600">
+          Your payment process was cancelled. No charges were made.
+        </p>
+      </div>
+      
+      <div className="mt-8 space-y-4 w-full max-w-md">
+        <Button asChild className="w-full">
+          <Link href="/">Return to Home</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+```
+
+### Step 2: Update the Router component in App.tsx
+
+Modify `client/src/App.tsx` to add the new routes:
+
+```typescript
+// Add these imports
+import CheckoutSuccess from "@/pages/checkout-success";
+import CheckoutCancel from "@/pages/checkout-cancel";
+
+// Update the Router component
+function Router() {
+  return (
+    <Switch>
+      {/* Public landing page */}
+      <Route path="/" component={Home} />
+
+      {/* Checkout routes */}
+      <Route path="/checkout/success" component={CheckoutSuccess} />
+      <Route path="/checkout/cancel" component={CheckoutCancel} />
+
+      {/* Protected routes */}
+      <Route path="/library">
+        {() => <ProtectedRoute component={Home} />}
+      </Route>
+
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+```
+
+### Step 3: Modify the "Start Cataloging" button in Home.tsx
+
+Update the button in `client/src/pages/home.tsx` to redirect to Stripe instead of opening Clerk modal:
+
+```typescript
+// Add this import
+import { useState } from "react";
+
+// In the Home component, add this function
+const [isLoading, setIsLoading] = useState(false);
+
+const handleStartCataloging = async () => {
+  try {
+    setIsLoading(true);
+    const response = await fetch('/api/create-checkout-session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    const { url } = await response.json();
+    
+    // Redirect to Stripe Checkout
+    window.location.href = url;
+  } catch (error) {
+    console.error('Checkout error:', error);
+    setIsLoading(false);
+  }
+};
+
+// Then replace the SignInButton in the hero section
+<div className="pt-4">
+  <Button 
+    size="lg" 
+    className="text-lg px-8" 
+    onClick={handleStartCataloging} 
+    disabled={isLoading}
+  >
+    {isLoading ? (
+      <>
+        <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent"></span>
+        Processing...
+      </>
+    ) : (
+      'Start Cataloging'
+    )}
+  </Button>
+</div>
+```
+
+Also update the "Get Started" button in the pricing section:
+
+```typescript
+<div className="mt-8">
+  <Button 
+    size="lg" 
+    variant="default" 
+    onClick={handleStartCataloging}
+    disabled={isLoading}
+  >
+    {isLoading ? "Processing..." : "Get Started"}
+  </Button>
+</div>
+```
+
+## 3. Handling User Authentication After Payment
+
+In `client/src/pages/checkout-success.tsx`, we've set up the logic to open the Clerk signup modal after a successful payment. This integrates the payment flow with the authentication flow.
+
+## 4. Testing the Implementation
+
+1. Set up your Stripe account and get your API keys
+2. Update your environment variables with the Stripe keys
+3. Start the development server
+4. Click "Start Cataloging" to test the checkout flow
+5. After payment, you should be redirected to the success page and prompted to create an account
+
+## 5. Production Considerations
+
+1. Set up proper error handling and logging
+2. Implement validation for Stripe webhooks
+3. Create a database table to track subscriptions and payment status
+4. Add subscription management features
+5. Implement proper authentication flows tied to payment status
+
+This implementation plan provides a solid foundation for integrating Stripe Checkout into your Shelfie application, while maintaining the existing authentication system with Clerk.
