@@ -192,9 +192,15 @@ export async function registerRoutes(app: Express) {
   });
 
   // Check if user has an active subscription
-  app.get("/api/subscription", requireAuth, ensureUserId, async (req, res) => {
+  app.get("/api/subscription", extractUserId, async (req, res) => {
     try {
-      const userId = req.userId;
+      const userId = req.auth?.userId;
+      
+      if (!userId) {
+        // If not authenticated, user has no subscription
+        return res.json({ subscribed: false });
+      }
+      
       const hasSubscription = await checkUserSubscription(userId);
       res.json({ subscribed: hasSubscription });
     } catch (error: any) {
@@ -234,12 +240,23 @@ export async function registerRoutes(app: Express) {
 
   app.post("/api/webhook", stripeWebhookMiddleware, async (req, res) => {
     try {
-      const signature = req.headers['stripe-signature'] as string;
-      const result = await handleWebhookEvent(req.body, signature);
-      res.json(result);
+      // Check if stripe-signature header exists
+      const signature = req.headers['stripe-signature'];
+      if (!signature) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Missing stripe-signature header" 
+        });
+      }
+      
+      const result = await handleWebhookEvent(req.body, signature as string);
+      res.json({ success: true, ...result });
     } catch (error: any) {
       console.error("Webhook error:", error);
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ 
+        success: false,
+        message: error.message || "Unknown webhook error"
+      });
     }
   });
 

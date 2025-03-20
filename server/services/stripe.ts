@@ -11,28 +11,52 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 // This function checks if a user has an active subscription
 export async function checkUserSubscription(userId: string): Promise<boolean> {
   try {
-    // In a real implementation, you would:
-    // 1. Look up the Stripe customer ID for this userId in your database
-    // 2. Query Stripe to check if the customer has an active subscription
-    
-    // For now, we'll use a direct lookup assuming you'll implement 
-    // the customer ID storage later
-    
-    // This is a placeholder implementation
+    // Look for customers with metadata.userId matching the Clerk userId
     const customers = await stripe.customers.list({
-      email: userId, // Using userId as email for demo purposes
-      limit: 1,
+      limit: 100
     });
     
-    if (customers.data.length === 0) {
-      return false; // No customer found
+    // Find the customer matching our userId in metadata
+    const matchingCustomer = customers.data.find(
+      customer => customer.metadata?.userId === userId
+    );
+    
+    if (!matchingCustomer) {
+      // As a fallback, check if any customers have been created with this client_reference_id
+      const checkoutSessions = await stripe.checkout.sessions.list({
+        limit: 100
+      });
+      
+      const matchingSession = checkoutSessions.data.find(
+        session => session.client_reference_id === userId && session.status === 'complete'
+      );
+      
+      if (!matchingSession) {
+        return false; // No matching customer or completed session found
+      }
+      
+      // Use the customer from the matching session
+      if (!matchingSession.customer) {
+        return false;
+      }
+      
+      const customerId = typeof matchingSession.customer === 'string' 
+        ? matchingSession.customer 
+        : matchingSession.customer.id;
+      
+      // Check for active subscriptions for this customer
+      const subscriptions = await stripe.subscriptions.list({
+        customer: customerId,
+        status: 'active',
+        limit: 1,
+      });
+      
+      return subscriptions.data.length > 0;
     }
     
-    const customerId = customers.data[0].id;
-    
-    // Check for active subscriptions
+    // Check for active subscriptions for the matching customer
     const subscriptions = await stripe.subscriptions.list({
-      customer: customerId,
+      customer: matchingCustomer.id,
       status: 'active',
       limit: 1,
     });
