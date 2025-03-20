@@ -177,5 +177,5 @@ export class MemStorage implements IStorage {
   }
 }
 
-// Export PostgresStorage by default
-export const storage = new PostgresStorage();
+// Temporarily use MemStorage while we debug PostgreSQL connection
+export const storage = new MemStorage();
