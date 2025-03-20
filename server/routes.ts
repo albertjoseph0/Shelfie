@@ -1,8 +1,10 @@
 import type { Express } from "express";
 import { createServer } from "http";
+import express from "express";
 import { storage } from "./storage";
 import { analyzeBookshelfImage } from "./services/openai";
 import { searchBook, getBookById } from "./services/google-books";
+import { createCheckoutSession, handleWebhookEvent } from "./services/stripe";
 import { insertBookSchema } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { extractUserId, requireAuth, ensureUserId } from "./middleware/auth";
@@ -186,6 +188,35 @@ export async function registerRoutes(app: Express) {
       res.json(details);
     } catch (error) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Stripe Checkout Routes
+  app.post("/api/create-checkout-session", async (req, res) => {
+    try {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const successUrl = `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${baseUrl}/checkout/cancel`;
+      
+      const session = await createCheckoutSession(successUrl, cancelUrl);
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Checkout session error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Add a raw body parser middleware for Stripe webhooks
+  const stripeWebhookMiddleware = express.raw({ type: 'application/json' });
+
+  app.post("/api/webhook", stripeWebhookMiddleware, async (req, res) => {
+    try {
+      const signature = req.headers['stripe-signature'] as string;
+      const result = await handleWebhookEvent(req.body, signature);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Webhook error:", error);
+      res.status(400).json({ error: error.message });
     }
   });
 
