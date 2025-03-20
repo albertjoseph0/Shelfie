@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Book } from "lucide-react";
-import { UserButton } from '@clerk/nextjs'; // Assuming you are using Clerk Next.js
+import { UserButton } from '@clerk/clerk-react'; // Assuming you are using Clerk Next.js
 
 export default function Navbar() {
   return (
