@@ -1,3 +1,4 @@
+import './types';
 import express from 'express';
 import serverless from 'serverless-http';
 import { extractUserId, requireAuth, ensureUserId } from '../server/middleware/auth';
@@ -83,7 +84,7 @@ app.post('/api/analyze', requireAuth, ensureUserId, async (req, res) => {
 
     const uploadId = nanoid();
     const analysis = await analyzeBookshelfImage(image);
-    
+
     const books = await Promise.all(
       analysis.books.map(async (book) => {
         const googleBooks = await searchBook(`${book.title} ${book.author || ''}`);
