@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { SignedIn, SignedOut } from '@clerk/clerk-react';
 import UploadDialog from "@/components/upload-dialog";
 import BookGrid from "@/components/book-grid";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ export default function Home() {
 
   const { data: books = [] } = useQuery({
     queryKey: ["/api/books"],
+    enabled: true, // Let the query run and handle 401 gracefully
   });
 
   const filteredBooks = searchQuery
@@ -35,39 +37,48 @@ export default function Home() {
           Catalog your physical book collection with ease. Simply upload a photo of
           your bookshelf and let AI do the work for you.
         </p>
-        <div className="flex justify-center gap-4">
-          <UploadDialog
-            onSuccess={() => {
-              // Query will automatically refresh
-            }}
-          />
-          {books.length > 0 && (
-            <Button variant="outline" onClick={handleExport} size="lg" className="gap-2">
-              <Download className="h-5 w-5" />
-              Export Library
-            </Button>
+
+        <SignedIn>
+          <div className="flex justify-center gap-4">
+            <UploadDialog
+              onSuccess={() => {
+                // Query will automatically refresh
+              }}
+            />
+            {books.length > 0 && (
+              <Button variant="outline" onClick={handleExport} size="lg" className="gap-2">
+                <Download className="h-5 w-5" />
+                Export Library
+              </Button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-4 max-w-md mx-auto">
+            <Input
+              placeholder="Search books..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          {filteredBooks.length > 0 ? (
+            <BookGrid books={filteredBooks} />
+          ) : (
+            <div className="text-center py-12">
+              <Book className="h-12 w-12 mx-auto text-muted-foreground" />
+              <p className="mt-4 text-muted-foreground">
+                No books found. Try uploading a shelf photo!
+              </p>
+            </div>
           )}
-        </div>
-      </div>
+        </SignedIn>
 
-      <div className="flex items-center gap-4 max-w-md mx-auto">
-        <Input
-          placeholder="Search books..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+        <SignedOut>
+          <div className="mt-8 flex flex-col items-center gap-4">
+            <p className="text-lg">Sign in to start cataloging your books</p>
+          </div>
+        </SignedOut>
       </div>
-
-      {filteredBooks.length > 0 ? (
-        <BookGrid books={filteredBooks} />
-      ) : (
-        <div className="text-center py-12">
-          <Book className="h-12 w-12 mx-auto text-muted-foreground" />
-          <p className="mt-4 text-muted-foreground">
-            No books found. Try uploading a shelf photo!
-          </p>
-        </div>
-      )}
     </div>
   );
 }
