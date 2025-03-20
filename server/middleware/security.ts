@@ -1,8 +1,8 @@
+import { Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import xss from "xss-clean";
 import hpp from "hpp";
-import { Request, Response, NextFunction } from "express";
 
 // Create a limiter that allows 100 requests per 15 minutes per IP
 export const apiLimiter = rateLimit({
@@ -57,10 +57,14 @@ export const setupSecurity = (app: any) => {
         objectSrc: ["'none'"],
         mediaSrc: ["'self'"],
         manifestSrc: ["'self'"],
+        workerSrc: ["'self'", "blob:", "*.clerk.com", "*.clerk.accounts.dev"], // Allow web workers
       },
     },
     crossOriginEmbedderPolicy: false,
   }));
+
+  // Set up trust proxy to properly handle rate limiting behind proxies
+  app.set('trust proxy', 1);
 
   // Prevent XSS attacks
   app.use(xss());

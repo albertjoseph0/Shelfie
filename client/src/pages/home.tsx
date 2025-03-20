@@ -5,7 +5,7 @@ import UploadDialog from "@/components/upload-dialog";
 import BookGrid from "@/components/book-grid";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Book, Download, Camera, CheckCircle, BookOpenCheck } from "lucide-react";
+import { Book, Download, Camera, CheckCircle, BookOpenCheck, Shield, Database, Zap } from "lucide-react";
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,6 +79,46 @@ export default function Home() {
             <div className="text-center space-y-3">
               <Book className="h-12 w-12 mx-auto text-muted-foreground" />
               <p className="text-muted-foreground">Demo video coming soon</p>
+            </div>
+          </div>
+
+          {/* Pricing Section */}
+          <div className="py-16 text-center">
+            <h2 className="text-3xl font-bold mb-12">Simple, Transparent Pricing</h2>
+            <div className="max-w-md mx-auto rounded-xl border bg-card p-8">
+              <div className="mb-8">
+                <span className="text-4xl font-bold">$20</span>
+                <span className="text-muted-foreground">/month</span>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 justify-center">
+                  <Camera className="h-5 w-5 text-primary" />
+                  <span>5 shelf uploads per hour</span>
+                </div>
+                <div className="flex items-center gap-2 justify-center">
+                  <Zap className="h-5 w-5 text-primary" />
+                  <span>100 API requests per 15 minutes</span>
+                </div>
+                <div className="flex items-center gap-2 justify-center">
+                  <Shield className="h-5 w-5 text-primary" />
+                  <span>Enterprise-grade security</span>
+                </div>
+                <div className="flex items-center gap-2 justify-center">
+                  <Database className="h-5 w-5 text-primary" />
+                  <span>Secure cloud storage</span>
+                </div>
+                <div className="flex items-center gap-2 justify-center">
+                  <Download className="h-5 w-5 text-primary" />
+                  <span>Export your library anytime</span>
+                </div>
+              </div>
+              <div className="mt-8">
+                <SignInButton mode="modal">
+                  <Button size="lg" variant="default">
+                    Get Started
+                  </Button>
+                </SignInButton>
+              </div>
             </div>
           </div>
 
