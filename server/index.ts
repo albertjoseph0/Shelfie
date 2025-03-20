@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import dotenv from "dotenv";
+import { setupSecurity, apiLimiter, errorHandler } from "./middleware/security";
 
 // Load environment variables from the appropriate .env file
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development';
@@ -23,9 +24,18 @@ if (missingEnvVars.length > 0) {
 }
 
 const app = express();
+
+// Body parsing middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
+// Setup security middleware
+setupSecurity(app);
+
+// Apply rate limiting to all routes
+app.use('/api/', apiLimiter);
+
+// Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -60,20 +70,8 @@ app.use((req, res, next) => {
   console.log('Initializing server...');
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    // Add specific handling for PayloadTooLargeError
-    if (err.type === 'entity.too.large') {
-      return res.status(413).json({
-        message: 'Image file is too large. Please upload a smaller image (max 50MB).'
-      });
-    }
-
-    res.status(status).json({ message });
-    console.error('Error:', err);
-  });
+  // Global error handling
+  app.use(errorHandler);
 
   if (app.get("env") === "development") {
     console.log('Starting in development mode with Vite middleware');

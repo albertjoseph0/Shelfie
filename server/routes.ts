@@ -6,6 +6,7 @@ import { searchBook, getBookById } from "./services/google-books";
 import { insertBookSchema } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { extractUserId, requireAuth, ensureUserId } from "./middleware/auth";
+import { authLimiter, uploadLimiter } from "./middleware/security";
 
 export async function registerRoutes(app: Express) {
   // Add authentication middleware to all routes
@@ -73,8 +74,8 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Book analysis and creation - protected
-  app.post("/api/analyze", requireAuth, ensureUserId, async (req, res) => {
+  // Book analysis and creation - protected and rate limited
+  app.post("/api/analyze", requireAuth, ensureUserId, uploadLimiter, async (req, res) => {
     try {
       const { image } = req.body;
       if (!image) {
@@ -84,7 +85,6 @@ export async function registerRoutes(app: Express) {
       const uploadId = nanoid();
       const analysis = await analyzeBookshelfImage(image);
 
-      // Process books code remains similar but adds userId
       const books = await Promise.all(
         analysis.books.map(async (book) => {
           const googleBooks = await searchBook(`${book.title} ${book.author || ''}`);
@@ -113,7 +113,6 @@ export async function registerRoutes(app: Express) {
             return null;
           }
 
-          // Pass userId to createBook
           const savedBook = await storage.createBook(parsed.data, uploadId, req.userId);
           return savedBook;
         })
