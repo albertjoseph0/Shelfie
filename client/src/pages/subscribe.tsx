@@ -1,18 +1,20 @@
 import { useEffect } from "react";
 import { useSubscription } from "@/hooks/use-subscription";
-import { useNavigate } from "wouter";
+import { useNavigate, useLocation } from "wouter";
 import { useAuth } from "@clerk/clerk-react";
 
 export default function Subscribe() {
   const { subscription, createCheckoutSession } = useSubscription();
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
   const { isSignedIn } = useAuth();
 
   useEffect(() => {
     if (subscription?.status === "active") {
-      navigate("/");
+      navigate("/library");
     } else if (isSignedIn) {
       createCheckoutSession.mutate();
+    } else {
+      navigate("/");
     }
   }, [subscription, isSignedIn]);
 

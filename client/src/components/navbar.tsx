@@ -21,7 +21,7 @@ export default function Navbar() {
             </SignedIn>
 
             <SignedOut>
-              <SignInButton mode="modal">
+              <SignInButton mode="modal" afterSignInUrl="/subscribe">
                 <Button variant="default" size="sm">Login</Button>
               </SignInButton>
             </SignedOut>
