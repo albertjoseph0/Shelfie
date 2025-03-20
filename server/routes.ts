@@ -5,16 +5,12 @@ import { analyzeBookshelfImage } from "./services/openai";
 import { searchBook, getBookById } from "./services/google-books";
 import { insertBookSchema } from "@shared/schema";
 import { nanoid } from "nanoid";
-import { requireAuth } from "./middleware/auth";
 
 export async function registerRoutes(app: Express) {
-  // Apply auth middleware to all /api routes
-  app.use("/api", requireAuth);
-
   // Get all books sorted by creation time (newest first)
-  app.get("/api/books", async (req, res) => {
+  app.get("/api/books", async (_req, res) => {
     try {
-      const books = await storage.getBooksByUser(req.auth!.userId);
+      const books = await storage.getBooks();
       // Sort books by createdAt in descending order (newest first)
       books.sort((a, b) => {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -26,9 +22,9 @@ export async function registerRoutes(app: Express) {
   });
 
   // Export library as CSV
-  app.get("/api/export", async (req, res) => {
+  app.get("/api/export", async (_req, res) => {
     try {
-      const books = await storage.getBooksByUser(req.auth!.userId);
+      const books = await storage.getBooks();
 
       // Create CSV header
       const csvRows = [
@@ -107,7 +103,7 @@ export async function registerRoutes(app: Express) {
             return null;
           }
 
-          const savedBook = await storage.createBook(parsed.data, uploadId, req.auth!.userId);
+          const savedBook = await storage.createBook(parsed.data, uploadId);
           console.log("Saved book:", savedBook);
           return savedBook;
         })
@@ -126,7 +122,7 @@ export async function registerRoutes(app: Express) {
   app.delete("/api/books/:id", async (req, res) => {
     try {
       const bookId = parseInt(req.params.id);
-      await storage.deleteBook(bookId, req.auth!.userId);
+      await storage.deleteBook(bookId);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: error.message });
@@ -137,7 +133,7 @@ export async function registerRoutes(app: Express) {
   app.delete("/api/uploads/:uploadId", async (req, res) => {
     try {
       const { uploadId } = req.params;
-      await storage.deleteBooksByUploadId(uploadId, req.auth!.userId);
+      await storage.deleteBooksByUploadId(uploadId);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: error.message });
@@ -148,7 +144,7 @@ export async function registerRoutes(app: Express) {
   app.get("/api/books/:id/details", async (req, res) => {
     try {
       const book = await storage.getBook(parseInt(req.params.id));
-      if (!book?.googleBooksId || book.userId !== req.auth!.userId) {
+      if (!book?.googleBooksId) {
         return res.status(404).json({ message: "Book not found" });
       }
 
