@@ -7,10 +7,14 @@ import { insertBookSchema } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { extractUserId, requireAuth, ensureUserId } from "./middleware/auth";
 import { authLimiter, uploadLimiter } from "./middleware/security";
+import stripeRouter from "./routes/stripe";
 
 export async function registerRoutes(app: Express) {
   // Add authentication middleware to all routes
   app.use(extractUserId);
+
+  // Mount Stripe routes
+  app.use("/api/stripe", stripeRouter);
 
   // Public routes
   app.get("/api/health", (_req, res) => {

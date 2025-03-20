@@ -48,15 +48,17 @@ export const setupSecurity = (app: any) => {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "*.clerk.com", "cdn.jsdelivr.net", "fonts.googleapis.com", "*.clerk.accounts.dev"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "*.clerk.com", "cdn.jsdelivr.net", "fonts.googleapis.com", "*.clerk.accounts.dev", "js.stripe.com"],
         styleSrc: ["'self'", "'unsafe-inline'", "*.clerk.com", "cdn.jsdelivr.net", "fonts.googleapis.com"],
         imgSrc: ["'self'", "data:", "https:", "blob:", "*.clerk.com", "*.googleusercontent.com"],
-        connectSrc: ["'self'", "*.clerk.com", "*.googleapis.com", "*.google-analytics.com", "*.clerk.accounts.dev"],
-        frameSrc: ["'self'", "*.clerk.com", "*.clerk.accounts.dev"],
+        connectSrc: ["'self'", "*.clerk.com", "*.googleapis.com", "*.google-analytics.com", "*.clerk.accounts.dev", "api.stripe.com"],
+        frameSrc: ["'self'", "*.clerk.com", "*.clerk.accounts.dev", "js.stripe.com", "hooks.stripe.com"],
         fontSrc: ["'self'", "data:", "fonts.googleapis.com", "fonts.gstatic.com"],
         objectSrc: ["'none'"],
         mediaSrc: ["'self'"],
         manifestSrc: ["'self'"],
+        workerSrc: ["'self'", "blob:"], // Added for worker support
+        childSrc: ["'self'", "blob:"], // Added for worker fallback
       },
     },
     crossOriginEmbedderPolicy: false,
@@ -70,9 +72,13 @@ export const setupSecurity = (app: any) => {
 
   // Set CORS headers
   app.use((req: Request, res: Response, next: NextFunction) => {
-    res.setHeader('Access-Control-Allow-Origin', process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL || '' : '*');
+    const origin = process.env.NODE_ENV === 'production' 
+      ? process.env.FRONTEND_URL || req.headers.origin
+      : req.headers.origin || '*';
+
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     next();
   });

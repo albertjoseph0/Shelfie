@@ -41,7 +41,7 @@ export default function Home() {
               Simply snap a photo of your bookshelf and watch as AI identifies and catalogs your entire collection. No more manual entry, no more hassle.
             </p>
             <div className="pt-4">
-              <SignInButton mode="modal">
+              <SignInButton mode="modal" afterSignInUrl="/subscribe">
                 <Button size="lg" className="text-lg px-8">
                   Start Cataloging
                 </Button>
