@@ -5,13 +5,21 @@ import { analyzeBookshelfImage } from "./services/openai";
 import { searchBook, getBookById } from "./services/google-books";
 import { insertBookSchema } from "@shared/schema";
 import { nanoid } from "nanoid";
+import { extractUserId, requireAuth, ensureUserId } from "./middleware/auth";
 
 export async function registerRoutes(app: Express) {
-  // Get all books sorted by creation time (newest first)
-  app.get("/api/books", async (_req, res) => {
+  // Add authentication middleware to all routes
+  app.use(extractUserId);
+
+  // Public routes
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok" });
+  });
+
+  // Protected routes - all API endpoints that need auth
+  app.get("/api/books", requireAuth, ensureUserId, async (req, res) => {
     try {
-      const books = await storage.getBooks();
-      // Sort books by createdAt in descending order (newest first)
+      const books = await storage.getBooks(req.userId);
       books.sort((a, b) => {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
@@ -21,10 +29,10 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Export library as CSV
-  app.get("/api/export", async (_req, res) => {
+  // Export library as CSV - protected
+  app.get("/api/export", requireAuth, ensureUserId, async (req, res) => {
     try {
-      const books = await storage.getBooks();
+      const books = await storage.getBooks(req.userId);
 
       // Create CSV header
       const csvRows = [
@@ -65,8 +73,8 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Book analysis and creation
-  app.post("/api/analyze", async (req, res) => {
+  // Book analysis and creation - protected
+  app.post("/api/analyze", requireAuth, ensureUserId, async (req, res) => {
     try {
       const { image } = req.body;
       if (!image) {
@@ -75,6 +83,8 @@ export async function registerRoutes(app: Express) {
 
       const uploadId = nanoid();
       const analysis = await analyzeBookshelfImage(image);
+
+      // Process books code remains similar but adds userId
       const books = await Promise.all(
         analysis.books.map(async (book) => {
           const googleBooks = await searchBook(`${book.title} ${book.author || ''}`);
@@ -103,14 +113,13 @@ export async function registerRoutes(app: Express) {
             return null;
           }
 
-          const savedBook = await storage.createBook(parsed.data, uploadId);
-          console.log("Saved book:", savedBook);
+          // Pass userId to createBook
+          const savedBook = await storage.createBook(parsed.data, uploadId, req.userId);
           return savedBook;
         })
       );
 
       const validBooks = books.filter(Boolean);
-      console.log(`Successfully saved ${validBooks.length} books`);
       res.json({ books: validBooks, uploadId });
     } catch (error) {
       console.error("Error in /api/analyze:", error);
@@ -118,32 +127,32 @@ export async function registerRoutes(app: Express) {
     }
   });
 
-  // Delete a single book
-  app.delete("/api/books/:id", async (req, res) => {
+  // Delete a single book - protected
+  app.delete("/api/books/:id", requireAuth, ensureUserId, async (req, res) => {
     try {
       const bookId = parseInt(req.params.id);
-      await storage.deleteBook(bookId);
+      await storage.deleteBook(bookId, req.userId);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Undo an upload
-  app.delete("/api/uploads/:uploadId", async (req, res) => {
+  // Undo an upload - protected
+  app.delete("/api/uploads/:uploadId", requireAuth, ensureUserId, async (req, res) => {
     try {
       const { uploadId } = req.params;
-      await storage.deleteBooksByUploadId(uploadId);
+      await storage.deleteBooksByUploadId(uploadId, req.userId);
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Get detailed book info
-  app.get("/api/books/:id/details", async (req, res) => {
+  // Get detailed book info - protected
+  app.get("/api/books/:id/details", requireAuth, ensureUserId, async (req, res) => {
     try {
-      const book = await storage.getBook(parseInt(req.params.id));
+      const book = await storage.getBook(parseInt(req.params.id), req.userId);
       if (!book?.googleBooksId) {
         return res.status(404).json({ message: "Book not found" });
       }
