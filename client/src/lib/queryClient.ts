@@ -1,13 +1,8 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
-import { useToast } from "@/hooks/use-toast";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    if (res.status === 440) {
-      throw new Error("Session expired. Please refresh the page.");
-    }
     throw new Error(`${res.status}: ${text}`);
   }
 }
@@ -17,39 +12,15 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Get token and session info from Clerk
-  let token;
-  try {
-    const { getToken, sessionId } = useAuth();
-    token = await getToken();
+  const res = await fetch(url, {
+    method,
+    headers: data ? { "Content-Type": "application/json" } : {},
+    body: data ? JSON.stringify(data) : undefined,
+    credentials: "include",
+  });
 
-    const headers: Record<string, string> = {
-      'X-Session-Id': sessionId || '',
-    };
-
-    if (data) {
-      headers["Content-Type"] = "application/json";
-    }
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    const res = await fetch(url, {
-      method,
-      headers,
-      body: data ? JSON.stringify(data) : undefined,
-      credentials: "include",
-    });
-
-    await throwIfResNotOk(res);
-    return res;
-  } catch (error) {
-    if (error.message.includes("Session expired")) {
-      // Force page refresh to re-authenticate
-      window.location.reload();
-    }
-    throw error;
-  }
+  await throwIfResNotOk(res);
+  return res;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -58,11 +29,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const { sessionId } = useAuth();
     const res = await fetch(queryKey[0] as string, {
-      headers: {
-        'X-Session-Id': sessionId || '',
-      },
       credentials: "include",
     });
 
