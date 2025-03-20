@@ -1,6 +1,5 @@
 import { Link } from "wouter";
 import { Book } from "lucide-react";
-import { UserButton } from '@clerk/clerk-react'; // Assuming you are using Clerk Next.js
 
 export default function Navbar() {
   return (
@@ -13,9 +12,6 @@ export default function Navbar() {
               <span className="font-merriweather text-xl font-bold">Shelfie</span>
             </a>
           </Link>
-          <div className="flex items-center gap-4">
-            <UserButton afterSignOutUrl="/" />
-          </div>
         </div>
       </div>
     </nav>
