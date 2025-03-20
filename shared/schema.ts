@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -13,7 +13,7 @@ export const books = pgTable("books", {
   description: text("description"),
   pageCount: integer("page_count"),
   googleBooksId: text("google_books_id"),
-  createdAt: text("created_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
   metadata: jsonb("metadata").$type<{
     categories?: string[];
     publishedDate?: string;
@@ -24,7 +24,8 @@ export const books = pgTable("books", {
 export const insertBookSchema = createInsertSchema(books).omit({ 
   id: true,
   userId: true, 
-  uploadId: true 
+  uploadId: true,
+  createdAt: true
 });
 
 export const libraries = pgTable("libraries", {
@@ -32,7 +33,7 @@ export const libraries = pgTable("libraries", {
   userId: integer("user_id").notNull(),
   bookId: integer("book_id").notNull(),
   shelfName: text("shelf_name").default("Default"),
-  addedAt: text("added_at").notNull(),
+  addedAt: timestamp("added_at").defaultNow().notNull(),
 });
 
 export const insertLibrarySchema = createInsertSchema(libraries).omit({ 

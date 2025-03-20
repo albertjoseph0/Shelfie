@@ -83,46 +83,72 @@ export async function registerRoutes(app: Express) {
       }
 
       const uploadId = nanoid();
+
+      // Get current month's book count
+      const monthlyCount = await storage.getBooksAddedThisMonth(req.userId);
       const analysis = await analyzeBookshelfImage(image);
+
+      // Check if adding these books would exceed the monthly limit
+      if (monthlyCount + analysis.books.length > 50) {
+        return res.status(403).json({
+          message: `Adding ${analysis.books.length} books would exceed your monthly limit of 50 books. You have added ${monthlyCount} books this month.`
+        });
+      }
 
       const books = await Promise.all(
         analysis.books.map(async (book) => {
-          const googleBooks = await searchBook(`${book.title} ${book.author || ''}`);
-          if (googleBooks.length === 0) return null;
+          try {
+            const googleBooks = await searchBook(`${book.title} ${book.author || ''}`);
+            if (googleBooks.length === 0) return null;
 
-          const bookInfo = googleBooks[0].volumeInfo;
-          const bookData = {
-            title: bookInfo.title,
-            author: bookInfo.authors?.[0] || "Unknown",
-            isbn: bookInfo.industryIdentifiers?.[0]?.identifier,
-            coverUrl: bookInfo.imageLinks?.thumbnail,
-            description: bookInfo.description,
-            pageCount: bookInfo.pageCount,
-            googleBooksId: googleBooks[0].id,
-            createdAt: new Date().toISOString(),
-            metadata: {
-              categories: bookInfo.categories,
-              publishedDate: bookInfo.publishedDate,
-              publisher: bookInfo.publisher
+            const bookInfo = googleBooks[0].volumeInfo;
+            const bookData = {
+              title: bookInfo.title,
+              author: bookInfo.authors?.[0] || "Unknown",
+              isbn: bookInfo.industryIdentifiers?.[0]?.identifier,
+              coverUrl: bookInfo.imageLinks?.thumbnail,
+              description: bookInfo.description,
+              pageCount: bookInfo.pageCount,
+              googleBooksId: googleBooks[0].id,
+              metadata: {
+                categories: bookInfo.categories,
+                publishedDate: bookInfo.publishedDate,
+                publisher: bookInfo.publisher
+              }
+            };
+
+            const parsed = insertBookSchema.safeParse(bookData);
+            if (!parsed.success) {
+              console.error("Book validation failed:", parsed.error);
+              return null;
             }
-          };
 
-          const parsed = insertBookSchema.safeParse(bookData);
-          if (!parsed.success) {
-            console.error("Book validation failed:", parsed.error);
+            const savedBook = await storage.createBook(parsed.data, uploadId, req.userId);
+            return savedBook;
+          } catch (error) {
+            if (error.message.includes("Monthly limit")) {
+              throw error; // Re-throw monthly limit errors
+            }
+            console.error("Error processing book:", error);
             return null;
           }
-
-          const savedBook = await storage.createBook(parsed.data, uploadId, req.userId);
-          return savedBook;
         })
-      );
+      ).catch(error => {
+        if (error.message.includes("Monthly limit")) {
+          throw error; // Re-throw monthly limit errors
+        }
+        return [];
+      });
 
       const validBooks = books.filter(Boolean);
       res.json({ books: validBooks, uploadId });
     } catch (error) {
       console.error("Error in /api/analyze:", error);
-      res.status(500).json({ message: error.message });
+      if (error.message.includes("Monthly limit")) {
+        res.status(403).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: error.message });
+      }
     }
   });
 
