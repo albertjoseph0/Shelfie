@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, jsonb, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -21,27 +21,10 @@ export const books = pgTable("books", {
   }>(),
 });
 
-export const userSubscriptions = pgTable("user_subscriptions", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().unique(),
-  stripeCustomerId: text("stripe_customer_id"),
-  stripeSubscriptionId: text("stripe_subscription_id"),
-  isActive: boolean("is_active").default(false),
-  currentPeriodEnd: timestamp("current_period_end"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
 export const insertBookSchema = createInsertSchema(books).omit({ 
   id: true,
   userId: true, 
   uploadId: true 
-});
-
-export const insertSubscriptionSchema = createInsertSchema(userSubscriptions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true
 });
 
 export const libraries = pgTable("libraries", {
@@ -60,5 +43,3 @@ export type Book = typeof books.$inferSelect;
 export type InsertBook = z.infer<typeof insertBookSchema>;
 export type Library = typeof libraries.$inferSelect;
 export type InsertLibrary = z.infer<typeof insertLibrarySchema>;
-export type UserSubscription = typeof userSubscriptions.$inferSelect;
-export type InsertUserSubscription = z.infer<typeof insertSubscriptionSchema>;

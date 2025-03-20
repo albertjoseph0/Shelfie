@@ -14,9 +14,7 @@ const requiredEnvVars = [
   'CLERK_SECRET_KEY',
   'VITE_CLERK_PUBLISHABLE_KEY',
   'OPENAI_API_KEY',
-  'GOOGLE_BOOKS_API_KEY',
-  'STRIPE_SECRET_KEY',
-  'STRIPE_WEBHOOK_SECRET'
+  'GOOGLE_BOOKS_API_KEY'
 ];
 
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
@@ -27,17 +25,14 @@ if (missingEnvVars.length > 0) {
 
 const app = express();
 
-// Trust proxy - required for rate limiting behind Replit's proxy
-app.set('trust proxy', 1);
-
-// Setup security middleware first
-setupSecurity(app);
-
 // Body parsing middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
-// Apply rate limiting to API routes
+// Setup security middleware
+setupSecurity(app);
+
+// Apply rate limiting to all routes
 app.use('/api/', apiLimiter);
 
 // Request logging middleware

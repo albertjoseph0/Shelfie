@@ -57,7 +57,6 @@ export const setupSecurity = (app: any) => {
         objectSrc: ["'none'"],
         mediaSrc: ["'self'"],
         manifestSrc: ["'self'"],
-        workerSrc: ["'self'", "blob:", "*.clerk.com"],
       },
     },
     crossOriginEmbedderPolicy: false,
