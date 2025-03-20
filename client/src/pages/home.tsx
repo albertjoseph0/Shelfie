@@ -93,23 +93,23 @@ export default function Home() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2 justify-center">
                   <Camera className="h-5 w-5 text-primary" />
-                  <span>5 shelf uploads per hour</span>
+                  <span>Add up to 5 bookshelves per hour</span>
                 </div>
                 <div className="flex items-center gap-2 justify-center">
                   <Zap className="h-5 w-5 text-primary" />
-                  <span>100 API requests per 15 minutes</span>
+                  <span>Lightning-fast book recognition</span>
                 </div>
                 <div className="flex items-center gap-2 justify-center">
                   <Shield className="h-5 w-5 text-primary" />
-                  <span>Enterprise-grade security</span>
+                  <span>Bank-level security for your library</span>
                 </div>
                 <div className="flex items-center gap-2 justify-center">
                   <Database className="h-5 w-5 text-primary" />
-                  <span>Secure cloud storage</span>
+                  <span>Unlimited books in your collection</span>
                 </div>
                 <div className="flex items-center gap-2 justify-center">
                   <Download className="h-5 w-5 text-primary" />
-                  <span>Export your library anytime</span>
+                  <span>Download your library anytime</span>
                 </div>
               </div>
               <div className="mt-8">
