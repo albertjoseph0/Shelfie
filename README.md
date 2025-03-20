@@ -1,146 +1,140 @@
-# 📚 Shelfie - Smart Book Cataloging App
+# Shelfie - AI Book Cataloging App
 
-Shelfie is a modern web application that makes cataloging your physical book collection effortless using AI-powered image recognition. Simply take a photo of your bookshelf, and let Shelfie do the rest!
+Shelfie is a modern web application that allows users to easily catalog their physical book collection. Simply upload a photo of your bookshelf, and Shelfie's AI vision system will identify the books and create a digital library for you.
 
-## ✨ Features
+## Features
 
-- **AI-Powered Book Detection**: Upload photos of your bookshelves and let our AI identify your books
-- **Google Books Integration**: Automatically fetch detailed book information and cover images
-- **Secure Authentication**: User-specific libraries with Clerk authentication
-- **Smart Organization**: Books are automatically sorted by addition date
-- **Export Capability**: Download your entire library as a CSV file with comprehensive book details
-- **Undo Support**: Easily undo recent shelf uploads if mistakes occur
-- **Individual Book Management**: Remove specific books from your library as needed
+- **AI-Powered Book Detection**: Upload a photo of your bookshelf, and the AI will identify book titles and authors
+- **Book Information Enrichment**: Integration with Google Books API to get detailed information, cover images, and metadata
+- **Search and Filter**: Easily search your book collection
+- **Export**: Download your library as a CSV file for use in other applications
+- **Modern UI**: Clean, responsive design built with React and Tailwind CSS
 
-## 🚀 Technology Stack
+## Technology Stack
 
-- **Frontend**: React with TypeScript
-- **UI Components**: shadcn/ui + Tailwind CSS
-- **Authentication**: Clerk
-- **API Integration**: Google Books API
-- **Image Analysis**: OpenAI GPT-4 Vision
-- **Database**: PostgreSQL with Drizzle ORM
-- **State Management**: TanStack Query
-- **Serverless Functions**: Vercel Edge Functions
+### Frontend
+- **React**: UI library 
+- **Tailwind CSS**: Utility-first CSS framework
+- **shadcn/ui**: High-quality, customizable UI components
+- **React Query**: Data fetching and state management
+- **Wouter**: Lightweight routing
 
-## 🏗️ Architecture
+### Backend
+- **Express**: Node.js web application framework
+- **OpenAI API**: Powers the AI vision capabilities (GPT-4o)
+- **Google Books API**: Book data enrichment
+- **In-memory storage**: For demo purposes (can be extended to use a database)
 
-- **Serverless First**: All API endpoints are implemented as serverless functions
-- **Edge-Ready**: Optimized for Vercel's edge network
-- **Type-Safe**: Full TypeScript implementation with shared types
-- **Modular Design**: Separate function handlers for each API endpoint
-
-## 🛠️ Setup
+## Getting Started
 
 ### Prerequisites
 
-1. Node.js 18+ installed
-2. PostgreSQL database
-3. API Keys:
-   - Clerk (Authentication)
-   - OpenAI (Image Analysis)
-   - Google Books API
+- Node.js (v16+)
+- npm or yarn
+- OpenAI API key
+- Google Books API key (optional)
 
-### Environment Variables
+### Environment Setup
 
-Create a `.env` file with the following:
+Create a `.env` file in the root directory with the following variables:
 
-```env
-# Authentication
-VITE_CLERK_PUBLISHABLE_KEY=your_publishable_key
-CLERK_SECRET_KEY=your_secret_key
-
-# APIs
-OPENAI_API_KEY=your_openai_key
-GOOGLE_BOOKS_API_KEY=your_google_books_key
-
-# Database
-DATABASE_URL=your_postgresql_url
+```
+OPENAI_API_KEY=your_openai_api_key
+GOOGLE_BOOKS_API_KEY=your_google_books_api_key
 ```
 
 ### Installation
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/shelfie.git
+cd shelfie
+```
 
-2. Install Vercel CLI (optional, for local testing):
-   ```bash
-   npm install -g vercel
-   ```
+2. Install dependencies:
+```bash
+npm install
+```
 
 3. Start the development server:
-   ```bash
-   npm run dev
-   ```
+```bash
+npm run dev
+```
 
-The application will be available at `http://localhost:5000`.
+4. Open your browser and navigate to `http://localhost:5000`
 
-## 📱 Usage
+## Usage Guide
 
-1. **Sign Up/Sign In**
-   - Click the "Sign In" button in the navigation bar
-   - Create an account or sign in using Clerk's authentication
+### Adding Books to Your Library
 
-2. **Adding Books**
-   - Click "Upload Shelf Photo" on the home page
-   - Select or drag & drop a photo of your bookshelf
-   - Wait for the AI to analyze and identify your books
-   - Books will automatically appear in your library
+1. **Upload a Shelf Photo**: Click the "Upload Shelf Photo" button on the homepage
+2. **Select an Image**: Choose a clear image of your bookshelf where book spines are visible
+3. **AI Analysis**: The app will analyze the image and identify books
+4. **Review Results**: Books will be added to your library with enriched information from Google Books
 
-3. **Managing Your Library**
-   - View all your books on the home page
-   - Click any book to see detailed information
-   - Use the search bar to find specific books
-   - Click the delete button on any book to remove it
-   - Use "Undo Last Upload" to reverse your most recent shelf addition
+### Managing Your Library
 
-4. **Exporting Your Library**
-   - Click "Export Library" to download a CSV file
-   - The export includes comprehensive book details including:
-     - Title and Author
-     - ISBN
-     - Publisher and Publication Date
-     - Categories
-     - Page Count
-     - Description
-     - Date Added to Library
+- **Search**: Use the search field to find books by title or author
+- **View Details**: Click on any book card to see detailed information
+- **Remove Books**: Hover over a book card and click the trash icon to remove it
+- **Export Library**: Click the "Export Library" button to download a CSV file of your collection
+- **Undo Last Upload**: If you made a mistake, you can undo your last upload with the "Undo Last Upload" button
 
-## 🔒 Security
+## Project Structure
 
-- All user data is private and secured through Clerk authentication
-- Each user can only access and modify their own library
-- API endpoints are protected and require authentication
-- Book data is associated with specific user accounts
+```
+shelfie/
+├── client/                  # Frontend code
+│   ├── src/
+│   │   ├── components/      # UI components
+│   │   ├── hooks/           # Custom React hooks
+│   │   ├── lib/             # Utility functions
+│   │   ├── pages/           # Page components
+│   │   └── App.tsx          # Main application component
+├── server/                  # Backend code
+│   ├── services/            # External API services
+│   │   ├── google-books.ts  # Google Books API integration
+│   │   └── openai.ts        # OpenAI API integration
+│   ├── index.ts             # Server entry point
+│   ├── routes.ts            # API routes
+│   ├── storage.ts           # In-memory data storage
+│   └── vite.ts              # Vite server configuration
+└── shared/                  # Shared code between client and server
+    └── schema.ts            # Data schemas
+```
 
-## ⚠️ Development Notes
+## Development
 
-### Current Limitations
+### Building for Production
 
-- The development environment uses in-memory storage which is NOT suitable for production
-- Data will be lost between function invocations in serverless environment
-- Multiple function instances may run simultaneously
+```bash
+npm run build
+```
 
-### Production Deployment
+This will create a production build in the `dist` directory.
 
-Before deploying to production:
-1. Implement persistent database storage
-2. Configure proper environment variables in Vercel dashboard
-3. Test all API endpoints in serverless environment
-4. Ensure proper error handling and logging
+### Running in Production
 
-## 📝 Notes
+```bash
+npm start
+```
 
-- Supported image formats: JPG, PNG
-- Maximum image size: 50MB
-- Books are ordered by date added (newest first)
-- The application requires an active internet connection for AI analysis and book information retrieval
+## Future Enhancements
 
-## 🚀 Deployment
+- User authentication and accounts
+- Multiple libraries and custom shelves
+- Reading progress tracking
+- Book recommendations
+- Mobile app with camera integration
+- Integration with Goodreads, StoryGraph and other book services
 
-The application is designed to be deployed on Vercel:
-1. Push your code to a Git repository
-2. Import the repository in Vercel
-3. Configure environment variables
-4. Deploy
+## License
+
+MIT
+
+## Acknowledgments
+
+- [OpenAI](https://openai.com/) for the vision AI capabilities
+- [Google Books API](https://developers.google.com/books) for book information
+- [shadcn/ui](https://ui.shadcn.com/) for the beautiful UI components
+- [Tailwind CSS](https://tailwindcss.com/) for the styling system
