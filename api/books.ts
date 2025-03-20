@@ -1,3 +1,8 @@
+// WARNING: This API uses in-memory storage which is NOT suitable for production.
+// The current implementation will lose data between function invocations
+// and won't work correctly with multiple instances.
+// TODO: Implement persistent storage before deploying to production.
+
 import { VercelRequest, VercelResponse } from './types';
 import { storage } from '../server/storage';
 import { requireAuth, ensureUserId } from '../server/middleware/auth';
@@ -47,8 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (error) {
       return res.status(500).json({ message: error.message });
     }
-  } 
-  else if (req.method === 'DELETE') {
+  } else if (req.method === 'DELETE') {
     try {
       const bookId = parseInt(req.query.id as string);
       await storage.deleteBook(bookId, req.userId);
