@@ -1,6 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
-import { books, type Book, type InsertBook } from "@shared/schema";
-import { db } from "./db";
+import type { Book, InsertBook } from "@shared/schema";
 
 export interface IStorage {
   // Book operations with userId
@@ -12,71 +10,71 @@ export interface IStorage {
   searchBooks(query: string, userId: string): Promise<Book[]>;
 }
 
-export class DatabaseStorage implements IStorage {
-  async createBook(book: InsertBook, uploadId: string, userId: string): Promise<Book> {
-    const [newBook] = await db
-      .insert(books)
-      .values({
-        ...book,
-        uploadId,
-        userId,
-        createdAt: new Date().toISOString(),
-      })
-      .returning();
+export class MemStorage implements IStorage {
+  private books: Map<number, Book & { uploadId: string, userId: string }>;
+  private bookId: number;
 
-    console.log(`Created book with ID ${newBook.id} for user ${userId}:`, newBook);
+  constructor() {
+    this.books = new Map();
+    this.bookId = 1;
+  }
+
+  async createBook(book: InsertBook, uploadId: string, userId: string): Promise<Book> {
+    const id = this.bookId++;
+    const newBook: Book & { uploadId: string, userId: string } = {
+      ...book,
+      id,
+      metadata: book.metadata ?? null,
+      isbn: book.isbn ?? null,
+      coverUrl: book.coverUrl ?? null,
+      description: book.description ?? null,
+      pageCount: book.pageCount ?? null,
+      googleBooksId: book.googleBooksId ?? null,
+      uploadId,
+      userId
+    };
+    this.books.set(id, newBook);
+    console.log(`Created book with ID ${id} for user ${userId}:`, newBook);
     return newBook;
   }
 
   async getBook(id: number, userId: string): Promise<Book | undefined> {
-    const [book] = await db
-      .select()
-      .from(books)
-      .where(and(eq(books.id, id), eq(books.userId, userId)));
-
-    return book;
+    const book = this.books.get(id);
+    return book && book.userId === userId ? book : undefined;
   }
 
   async getBooks(userId: string): Promise<Book[]> {
-    const userBooks = await db
-      .select()
-      .from(books)
-      .where(eq(books.userId, userId))
-      .orderBy(desc(books.createdAt));
-
-    console.log(`Retrieved ${userBooks.length} books for user ${userId}`);
-    return userBooks;
+    const books = Array.from(this.books.values())
+      .filter(book => book.userId === userId);
+    console.log(`Retrieved ${books.length} books for user ${userId}`);
+    return books;
   }
 
   async deleteBook(id: number, userId: string): Promise<void> {
-    await db
-      .delete(books)
-      .where(and(eq(books.id, id), eq(books.userId, userId)));
-
-    console.log(`Deleted book with ID ${id} for user ${userId}`);
+    const book = this.books.get(id);
+    if (book && book.userId === userId) {
+      this.books.delete(id);
+      console.log(`Deleted book with ID ${id} for user ${userId}`);
+    }
   }
 
   async deleteBooksByUploadId(uploadId: string, userId: string): Promise<void> {
-    const result = await db
-      .delete(books)
-      .where(and(eq(books.uploadId, uploadId), eq(books.userId, userId)));
+    const booksToDelete = Array.from(this.books.entries())
+      .filter(([_, book]) => book.uploadId === uploadId && book.userId === userId);
 
-    console.log(`Deleted books from upload ${uploadId} for user ${userId}`);
+    booksToDelete.forEach(([id]) => this.books.delete(id));
+    console.log(`Deleted ${booksToDelete.length} books from upload ${uploadId} for user ${userId}`);
   }
 
   async searchBooks(query: string, userId: string): Promise<Book[]> {
     const lowercaseQuery = query.toLowerCase();
-
-    const userBooks = await db
-      .select()
-      .from(books)
-      .where(eq(books.userId, userId));
-
-    return userBooks.filter(book =>
-      book.title.toLowerCase().includes(lowercaseQuery) ||
-      book.author.toLowerCase().includes(lowercaseQuery)
-    );
+    return Array.from(this.books.values())
+      .filter(book => book.userId === userId)
+      .filter(book => 
+        book.title.toLowerCase().includes(lowercaseQuery) ||
+        book.author.toLowerCase().includes(lowercaseQuery)
+      );
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new MemStorage();
