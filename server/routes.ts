@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import express, { type Express } from "express";
 import { createServer } from "http";
 import { storage } from "./storage";
 import { analyzeBookshelfImage } from "./services/openai";

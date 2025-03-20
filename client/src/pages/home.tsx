@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { SignedIn, SignedOut, useAuth, SignInButton } from "@clerk/clerk-react";
-import { Link, useNavigate } from "wouter";
+import { Link, useLocation } from "wouter";
 import type { Book } from "@shared/schema";
 import UploadDialog from "@/components/upload-dialog";
 import BookGrid from "@/components/book-grid";
@@ -22,7 +22,7 @@ import {
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const { isSignedIn } = useAuth();
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const { isSubscribed } = useSubscription();
 
   const { data: books = [] } = useQuery<Book[]>({
@@ -182,7 +182,7 @@ export default function Home() {
                   <Button 
                     size="lg" 
                     className="text-lg px-8"
-                    onClick={() => navigate('/subscribe')}
+                    onClick={() => setLocation('/subscribe')}
                   >
                     View Subscription Options
                   </Button>
@@ -316,7 +316,7 @@ export default function Home() {
               <h3 className="font-semibold mb-4">Contact</h3>
               <ul className="space-y-2 text-sm">
                 <li>
-
+                  <a
                     href="mailto:support@shelfie.app"
                     className="text-muted-foreground hover:text-foreground"
                   >
