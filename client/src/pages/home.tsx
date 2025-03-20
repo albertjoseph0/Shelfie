@@ -31,6 +31,10 @@ export default function Home() {
   useEffect(() => {
     if (isSignedIn) {
       checkSubscription();
+    } else {
+      // Reset subscription state when signed out
+      setIsSubscribed(false);
+      setIsCheckingSubscription(false);
     }
   }, [isSignedIn]);
   
@@ -41,7 +45,13 @@ export default function Home() {
     try {
       setIsCheckingSubscription(true);
       const response = await fetch('/api/subscription');
+      
+      if (!response.ok) {
+        throw new Error('Failed to check subscription status');
+      }
+      
       const data = await response.json();
+      console.log('Subscription check:', data);
       setIsSubscribed(data.subscribed);
     } catch (error) {
       console.error('Error checking subscription:', error);
@@ -54,18 +64,23 @@ export default function Home() {
   const handleStartCataloging = async () => {
     if (!isSignedIn) {
       // If not signed in, we don't need this function
-      // The SignInButton component will handle opening the auth modal
+      // SignInButton component will handle opening the auth modal
       return;
     }
     
-    // If already subscribed, no need to go to checkout
+    // Re-check subscription status first
+    await checkSubscription();
+    
+    // If already subscribed, redirect to the library page
     if (isSubscribed) {
-      // Just navigate to the library page or other action
+      window.location.href = '/library';
       return;
     }
     
     try {
       setIsLoading(true);
+      console.log('Creating checkout session...');
+      
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: {
@@ -73,21 +88,31 @@ export default function Home() {
         },
       });
       
+      console.log('Checkout response status:', response.status);
+      
       if (!response.ok) {
         const errorData = await response.json();
+        console.log('Checkout error response:', errorData);
+        
         if (errorData.subscribed) {
           // User has subscription but our local state didn't catch it
           setIsSubscribed(true);
           setIsLoading(false);
+          window.location.href = '/library';
           return;
         }
         throw new Error(errorData.error || 'Failed to create checkout session');
       }
       
-      const { url } = await response.json();
+      const data = await response.json();
+      console.log('Checkout response data:', data);
       
-      // Redirect to Stripe Checkout
-      window.location.href = url;
+      if (data.url) {
+        // Redirect to Stripe Checkout
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
     } catch (error) {
       console.error('Checkout error:', error);
       setIsLoading(false);

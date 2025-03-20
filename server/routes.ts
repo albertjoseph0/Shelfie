@@ -225,14 +225,24 @@ export async function registerRoutes(app: Express) {
   });
 
   // Stripe Checkout Routes - requires authentication
-  app.post("/api/create-checkout-session", requireAuth, ensureUserId, async (req, res) => {
+  app.post("/api/create-checkout-session", extractUserId, async (req, res) => {
     try {
-      const userId = req.userId;
+      const userId = req.auth?.userId;
+      
+      if (!userId) {
+        return res.status(401).json({ 
+          success: false,
+          message: "Authentication required" 
+        });
+      }
+      
+      console.log("Creating checkout session for userId:", userId);
       
       // Check if the user already has an active subscription
       const hasSubscription = await checkUserSubscription(userId);
       if (hasSubscription) {
         return res.status(400).json({ 
+          success: false,
           error: "You already have an active subscription",
           subscribed: true
         });
@@ -242,11 +252,26 @@ export async function registerRoutes(app: Express) {
       const successUrl = `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
       const cancelUrl = `${baseUrl}/checkout/cancel`;
       
+      console.log("Creating Stripe checkout session with success URL:", successUrl);
+      
       const session = await createCheckoutSession(successUrl, cancelUrl, userId);
-      res.json({ url: session.url });
+      
+      if (!session.url) {
+        throw new Error("No checkout URL returned from Stripe");
+      }
+      
+      console.log("Checkout session created, redirecting to:", session.url);
+      
+      res.json({ 
+        success: true,
+        url: session.url 
+      });
     } catch (error: any) {
       console.error("Checkout session error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ 
+        success: false,
+        message: error.message || "Failed to create checkout session" 
+      });
     }
   });
 
