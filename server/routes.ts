@@ -3,10 +3,15 @@ import { createServer } from "http";
 import { storage } from "./storage";
 import { analyzeBookshelfImage } from "./services/openai";
 import { searchBook, getBookById } from "./services/google-books";
-import { insertBookSchema } from "@shared/schema";
+import { insertBookSchema, subscriptions } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { extractUserId, requireAuth, ensureUserId } from "./middleware/auth";
 import { authLimiter, uploadLimiter } from "./middleware/security";
+import { requireSubscription } from "./middleware/subscription";
+import { createCheckoutSession, getSubscriptionStatus, stripe } from "./services/stripe";
+import { eq } from "drizzle-orm";
+import { db } from "./db";
+import express from "express";
 
 export async function registerRoutes(app: Express) {
   // Add authentication middleware to all routes
@@ -16,9 +21,96 @@ export async function registerRoutes(app: Express) {
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });
   });
+  
+  // Route to create checkout session
+  app.post("/api/create-checkout-session", requireAuth, ensureUserId, async (req, res) => {
+    try {
+      const { successUrl, cancelUrl } = req.body;
+      
+      if (!successUrl || !cancelUrl) {
+        return res.status(400).json({ message: "Missing success or cancel URL" });
+      }
+      
+      if (!req.userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const session = await createCheckoutSession(
+        req.userId, 
+        successUrl, 
+        cancelUrl
+      );
+      
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Error creating checkout session:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 
-  // Protected routes - all API endpoints that need auth
-  app.get("/api/books", requireAuth, ensureUserId, async (req, res) => {
+  // Route to check subscription status
+  app.get("/api/subscription", requireAuth, ensureUserId, async (req, res) => {
+    try {
+      if (!req.userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const status = await getSubscriptionStatus(req.userId);
+      res.json(status);
+    } catch (error: any) {
+      console.error("Error checking subscription:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Webhook endpoint for Stripe events
+  app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), async (req, res) => {
+    const signature = req.headers['stripe-signature'];
+    
+    try {
+      if (!signature || !process.env.STRIPE_WEBHOOK_SECRET) {
+        throw new Error("Missing stripe signature or webhook secret");
+      }
+      
+      const event = stripe.webhooks.constructEvent(
+        req.body,
+        signature,
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
+      
+      // Handle subscription-related events
+      if (event.type === 'checkout.session.completed') {
+        const session = event.data.object as any;
+        const userId = session.client_reference_id;
+        
+        if (session.mode === 'subscription') {
+          // Update subscription in database
+          await db.insert(subscriptions).values({
+            userId,
+            stripeCustomerId: session.customer,
+            stripeSubscriptionId: session.subscription,
+            status: 'active'
+          });
+        }
+      } else if (event.type === 'customer.subscription.deleted') {
+        const subscription = event.data.object as any;
+        
+        // Update subscription status in database
+        await db
+          .update(subscriptions)
+          .set({ status: 'canceled' })
+          .where(eq(subscriptions.stripeSubscriptionId, subscription.id));
+      }
+      
+      res.json({ received: true });
+    } catch (err: any) {
+      console.error('Webhook Error:', err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+  });
+
+  // Protected routes - all API endpoints that need auth and subscription
+  app.get("/api/books", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
       const books = await storage.getBooks(req.userId);
       books.sort((a, b) => {
@@ -31,7 +123,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Export library as CSV - protected
-  app.get("/api/export", requireAuth, ensureUserId, async (req, res) => {
+  app.get("/api/export", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
       const books = await storage.getBooks(req.userId);
 
@@ -75,7 +167,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Book analysis and creation - protected and rate limited
-  app.post("/api/analyze", requireAuth, ensureUserId, uploadLimiter, async (req, res) => {
+  app.post("/api/analyze", requireAuth, ensureUserId, requireSubscription, uploadLimiter, async (req, res) => {
     try {
       const { image } = req.body;
       if (!image) {
@@ -153,7 +245,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Delete a single book - protected
-  app.delete("/api/books/:id", requireAuth, ensureUserId, async (req, res) => {
+  app.delete("/api/books/:id", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
       const bookId = parseInt(req.params.id);
       await storage.deleteBook(bookId, req.userId);
@@ -164,7 +256,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Undo an upload - protected
-  app.delete("/api/uploads/:uploadId", requireAuth, ensureUserId, async (req, res) => {
+  app.delete("/api/uploads/:uploadId", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
       const { uploadId } = req.params;
       await storage.deleteBooksByUploadId(uploadId, req.userId);
@@ -175,7 +267,7 @@ export async function registerRoutes(app: Express) {
   });
 
   // Get detailed book info - protected
-  app.get("/api/books/:id/details", requireAuth, ensureUserId, async (req, res) => {
+  app.get("/api/books/:id/details", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
       const book = await storage.getBook(parseInt(req.params.id), req.userId);
       if (!book?.googleBooksId) {

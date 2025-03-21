@@ -4,9 +4,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required");
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2024-01-29',
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export async function createCheckoutSession(userId: string, successUrl: string, cancelUrl: string) {
   const session = await stripe.checkout.sessions.create({
