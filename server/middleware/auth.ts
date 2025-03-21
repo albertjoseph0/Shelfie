@@ -21,11 +21,20 @@ declare global {
   }
 }
 
+// Options for Clerk authentication - enable Bearer token support
+const clerkOptions = {
+  authorizedParties: [],
+  jwtKey: process.env.CLERK_JWT_KEY,
+  apiKey: process.env.CLERK_SECRET_KEY,
+  // Tell Clerk to look for the auth token in the Authorization header
+  headerToken: true
+};
+
 // Middleware to extract userId and make it available in req
-export const extractUserId = ClerkExpressWithAuth();
+export const extractUserId = ClerkExpressWithAuth(clerkOptions);
 
 // Middleware to require authentication for specific routes
-export const requireAuth = ClerkExpressRequireAuth();
+export const requireAuth = ClerkExpressRequireAuth(clerkOptions);
 
 // Helper middleware to ensure userId exists and convert it to internal format
 export const ensureUserId = (req: Request, res: Response, next: NextFunction) => {

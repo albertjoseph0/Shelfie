@@ -1,4 +1,13 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { useAuth } from "@clerk/clerk-react";
+
+// Get the auth's session token
+let authToken: string | null = null;
+
+// Function to update the auth token
+export function setAuthToken(token: string | null) {
+  authToken = token;
+}
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -11,10 +20,20 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  options?: {
+    responseType?: 'json' | 'blob' | 'text';
+    headers?: Record<string, string>;
+  }
 ): Promise<Response> {
+  const headers: Record<string, string> = {
+    ...(data ? { "Content-Type": "application/json" } : {}),
+    ...(authToken ? { "Authorization": `Bearer ${authToken}` } : {}),
+    ...(options?.headers || {})
+  };
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -29,8 +48,13 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const headers: Record<string, string> = {
+      ...(authToken ? { "Authorization": `Bearer ${authToken}` } : {})
+    };
+
     const res = await fetch(queryKey[0] as string, {
       credentials: "include",
+      headers
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
