@@ -128,6 +128,10 @@ export async function registerRoutes(app: Express) {
   // Export library as CSV - protected
   app.get("/api/export", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
+      if (!req.userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
       const books = await storage.getBooks(req.userId);
 
       // Create CSV header
@@ -164,8 +168,8 @@ export async function registerRoutes(app: Express) {
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename=my-library.csv');
       res.send(csvRows.join("\n"));
-    } catch (error) {
-      res.status(500).json({ message: error.message });
+    } catch (error: any) {
+      res.status(500).json({ message: error?.message || "An error occurred" });
     }
   });
 
@@ -175,6 +179,10 @@ export async function registerRoutes(app: Express) {
       const { image } = req.body;
       if (!image) {
         return res.status(400).json({ message: "Image data is required" });
+      }
+      
+      if (!req.userId) {
+        return res.status(401).json({ message: "Unauthorized" });
       }
 
       const uploadId = nanoid();
@@ -220,16 +228,16 @@ export async function registerRoutes(app: Express) {
 
             const savedBook = await storage.createBook(parsed.data, uploadId, req.userId);
             return savedBook;
-          } catch (error) {
-            if (error.message.includes("Monthly limit")) {
+          } catch (error: any) {
+            if (error.message?.includes("Monthly limit")) {
               throw error; // Re-throw monthly limit errors
             }
             console.error("Error processing book:", error);
             return null;
           }
         })
-      ).catch(error => {
-        if (error.message.includes("Monthly limit")) {
+      ).catch((error: any) => {
+        if (error.message?.includes("Monthly limit")) {
           throw error; // Re-throw monthly limit errors
         }
         return [];
@@ -237,12 +245,12 @@ export async function registerRoutes(app: Express) {
 
       const validBooks = books.filter(Boolean);
       res.json({ books: validBooks, uploadId });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error in /api/analyze:", error);
-      if (error.message.includes("Monthly limit")) {
+      if (error.message?.includes("Monthly limit")) {
         res.status(403).json({ message: error.message });
       } else {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: error?.message || "An error occurred" });
       }
     }
   });
@@ -250,43 +258,59 @@ export async function registerRoutes(app: Express) {
   // Delete a single book - protected
   app.delete("/api/books/:id", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
+      if (!req.userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
       const bookId = parseInt(req.params.id);
       await storage.deleteBook(bookId, req.userId);
       res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ message: error.message });
+    } catch (error: any) {
+      res.status(500).json({ message: error?.message || "An error occurred" });
     }
   });
 
   // Undo an upload - protected
   app.delete("/api/uploads/:uploadId", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
+      if (!req.userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
       const { uploadId } = req.params;
       await storage.deleteBooksByUploadId(uploadId, req.userId);
       res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ message: error.message });
+    } catch (error: any) {
+      res.status(500).json({ message: error?.message || "An error occurred" });
     }
   });
 
   // Search books - protected
   app.get("/api/search", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
+      if (!req.userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
       const query = req.query.q as string;
       if (!query) {
         return res.status(400).json({ message: "Search query is required" });
       }
       
-      const results = await storage.searchBooks(query, req.userId as string);
+      const results = await storage.searchBooks(query, req.userId);
       res.json(results);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: error?.message || "An error occurred" });
     }
   });
 
   // Get detailed book info - protected
   app.get("/api/books/:id/details", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
+      if (!req.userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
       const book = await storage.getBook(parseInt(req.params.id), req.userId);
       if (!book?.googleBooksId) {
         return res.status(404).json({ message: "Book not found" });
@@ -294,8 +318,8 @@ export async function registerRoutes(app: Express) {
 
       const details = await getBookById(book.googleBooksId);
       res.json(details);
-    } catch (error) {
-      res.status(500).json({ message: error.message });
+    } catch (error: any) {
+      res.status(500).json({ message: error?.message || "An error occurred" });
     }
   });
 

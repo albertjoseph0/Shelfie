@@ -100,13 +100,17 @@ export default function Home() {
 
             {/* Pricing Section */}
             <div className="py-16 text-center">
-              <h2 className="text-3xl font-bold mb-12">
-                Simple, Transparent Pricing
+              <h2 className="text-3xl font-bold mb-6">
+                Start Your Digital Library Today
               </h2>
-              <div className="max-w-md mx-auto rounded-xl border bg-card p-8">
+              <p className="text-muted-foreground max-w-2xl mx-auto mb-10">
+                One simple plan with all the features you need. No free tier or complicated pricing.
+              </p>
+              <div className="max-w-md mx-auto rounded-xl border-2 border-primary bg-card p-8 shadow-lg">
                 <div className="mb-8">
                   <span className="text-4xl font-bold">$20</span>
                   <span className="text-muted-foreground">/month</span>
+                  <p className="text-sm text-muted-foreground mt-2">Cancel anytime</p>
                 </div>
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 justify-center">
@@ -125,11 +129,15 @@ export default function Home() {
                     <Download className="h-5 w-5 text-primary" />
                     <span>Download your library anytime</span>
                   </div>
+                  <div className="flex items-center gap-2 justify-center">
+                    <Database className="h-5 w-5 text-primary" />
+                    <span>Unlimited storage for your book data</span>
+                  </div>
                 </div>
                 <div className="mt-8">
                   <SignInButton mode="modal">
-                    <Button size="lg" variant="default">
-                      Start Cataloging
+                    <Button size="lg" variant="default" className="font-semibold px-8 py-6 text-lg">
+                      Get Started Now
                     </Button>
                   </SignInButton>
                 </div>

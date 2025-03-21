@@ -4,6 +4,17 @@ import { useAuth } from "@clerk/clerk-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Loader2 } from "lucide-react";
 
+/**
+ * SubscriptionCheck - Direct Subscription Flow Component
+ * 
+ * This component implements a streamlined flow:
+ * 1. Check if user has an active subscription
+ * 2. If not, immediately redirect to Stripe Checkout
+ * 3. On successful payment, user will be redirected back to the app
+ * 
+ * This component should be used for authenticated routes that
+ * require a subscription.
+ */
 export default function SubscriptionCheck({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -39,7 +50,26 @@ export default function SubscriptionCheck({ children }: { children: React.ReactN
         setCheckAttempted(true);
         
         if (!data.isSubscribed) {
-          navigate("/subscribe");
+          // Create checkout session and redirect to Stripe directly
+          try {
+            const checkoutResponse = await apiRequest("POST", "/api/create-checkout-session", {
+              successUrl: `${window.location.origin}${location}?subscribed=true`,
+              cancelUrl: `${window.location.origin}/subscribe?canceled=true`,
+            });
+            
+            const checkoutData = await checkoutResponse.json();
+            
+            if (checkoutData.url) {
+              // Redirect to Stripe checkout
+              window.location.href = checkoutData.url;
+            } else {
+              // Fallback to the subscribe page if something goes wrong
+              navigate("/subscribe");
+            }
+          } catch (error) {
+            console.error("Failed to create checkout session:", error);
+            navigate("/subscribe");
+          }
         }
       } catch (error) {
         console.error("Failed to check subscription:", error);
@@ -57,16 +87,19 @@ export default function SubscriptionCheck({ children }: { children: React.ReactN
   if (isLoading && isSignedIn) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="text-center space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+          <p className="text-lg">Checking subscription status...</p>
+        </div>
       </div>
     );
   }
 
-  // Non-authenticated users can see all public content
+  // Non-authenticated users shouldn't see subscription-only content
   if (!isSignedIn) {
-    return children;
+    return null;
   }
 
-  // We're either subscribed or already being redirected
+  // We're either subscribed or already being redirected to Stripe
   return isSubscribed ? children : null;
 }
