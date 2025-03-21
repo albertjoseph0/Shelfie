@@ -1,0 +1,559 @@
+I'll create an implementation plan for integrating Stripe Checkout with your Shelfie application. This will handle subscription management for your book cataloging service, ensuring users are properly authenticated and subscribed before accessing the main features.
+
+# Implementation Plan for Stripe Integration
+
+## Step 1: Set Up Stripe Account and Products
+
+1. Create a Stripe account if you don't have one
+2. Create a product for your $20/month subscription
+3. Add the necessary Stripe API keys to your environment variables
+
+## Step 2: Install Stripe Dependencies
+
+```bash
+npm install stripe @stripe/stripe-js
+```
+
+## Step 3: Create a Subscription Service
+
+First, let's create a server-side service for handling Stripe operations:
+
+```typescript
+// server/services/stripe.ts
+import Stripe from 'stripe';
+
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error("STRIPE_SECRET_KEY environment variable is required");
+}
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2024-01-29',
+});
+
+export async function createCheckoutSession(userId: string, successUrl: string, cancelUrl: string) {
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ['card'],
+    mode: 'subscription',
+    line_items: [
+      {
+        price: process.env.STRIPE_PRICE_ID, // The price ID for your $20/month subscription
+        quantity: 1,
+      },
+    ],
+    customer_email: userId, // Using Clerk user ID as customer reference
+    client_reference_id: userId,
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    metadata: {
+      userId,
+    },
+  });
+
+  return session;
+}
+
+export async function getSubscriptionStatus(userId: string) {
+  // Find customers with the matching userId in metadata
+  const customers = await stripe.customers.list({
+    email: userId,
+  });
+
+  if (customers.data.length === 0) {
+    return { isSubscribed: false };
+  }
+
+  // Get subscriptions for the customer
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customers.data[0].id,
+    status: 'active',
+  });
+
+  return {
+    isSubscribed: subscriptions.data.length > 0,
+    subscriptionData: subscriptions.data[0] || null,
+  };
+}
+```
+
+## Step 4: Create Subscription Schema in Database
+
+Add a subscription table to track user subscriptions:
+
+```typescript
+// shared/schema.ts - Add this to your existing schema
+export const subscriptions = pgTable("subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  status: text("status").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type Subscription = typeof subscriptions.$inferSelect;
+```
+
+## Step 5: Add Subscription Routes
+
+```typescript
+// server/routes.ts - Add these routes to your existing routes
+
+// Route to create checkout session
+app.post("/api/create-checkout-session", requireAuth, ensureUserId, async (req, res) => {
+  try {
+    const { successUrl, cancelUrl } = req.body;
+    
+    if (!successUrl || !cancelUrl) {
+      return res.status(400).json({ message: "Missing success or cancel URL" });
+    }
+    
+    const session = await createCheckoutSession(
+      req.userId, 
+      successUrl, 
+      cancelUrl
+    );
+    
+    res.json({ url: session.url });
+  } catch (error) {
+    console.error("Error creating checkout session:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Route to check subscription status
+app.get("/api/subscription", requireAuth, ensureUserId, async (req, res) => {
+  try {
+    const status = await getSubscriptionStatus(req.userId);
+    res.json(status);
+  } catch (error) {
+    console.error("Error checking subscription:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+```
+
+## Step 6: Add Subscription Middleware
+
+```typescript
+// server/middleware/subscription.ts
+import { Request, Response, NextFunction } from "express";
+import { getSubscriptionStatus } from "../services/stripe";
+
+export const requireSubscription = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { isSubscribed } = await getSubscriptionStatus(req.userId);
+    
+    if (!isSubscribed) {
+      return res.status(403).json({ 
+        message: "Subscription required", 
+        subscriptionRequired: true 
+      });
+    }
+    
+    next();
+  } catch (error) {
+    console.error("Error checking subscription:", error);
+    res.status(500).json({ message: "Error checking subscription status" });
+  }
+};
+```
+
+## Step 7: Protect Routes with Subscription Check
+
+Modify your existing routes to require subscription:
+
+```typescript
+// server/routes.ts - Update protected routes
+
+// Import the subscription middleware
+import { requireSubscription } from "./middleware/subscription";
+
+// Update the books route to require subscription
+app.get(
+  "/api/books", 
+  requireAuth, 
+  ensureUserId, 
+  requireSubscription, 
+  async (req, res) => {
+    // Existing route handler
+  }
+);
+
+// Protect the analyze endpoint
+app.post(
+  "/api/analyze", 
+  requireAuth, 
+  ensureUserId, 
+  requireSubscription, 
+  uploadLimiter, 
+  async (req, res) => {
+    // Existing route handler
+  }
+);
+
+// Protect other endpoints as needed
+```
+
+## Step 8: Create Client-Side Subscription Check Component
+
+```typescript
+// client/src/components/subscription-check.tsx
+import { useEffect, useState } from "react";
+import { useNavigate } from "wouter";
+import { useAuth } from "@clerk/clerk-react";
+import { apiRequest } from "@/lib/queryClient";
+import { Loader2 } from "lucide-react";
+
+export default function SubscriptionCheck({ children }: { children: React.ReactNode }) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const { isSignedIn } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isSignedIn) {
+      setIsLoading(false);
+      return;
+    }
+
+    const checkSubscription = async () => {
+      try {
+        const response = await apiRequest("GET", "/api/subscription");
+        const data = await response.json();
+        setIsSubscribed(data.isSubscribed);
+        
+        if (!data.isSubscribed) {
+          navigate("/subscribe");
+        }
+      } catch (error) {
+        console.error("Failed to check subscription:", error);
+        navigate("/subscribe");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkSubscription();
+  }, [isSignedIn, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return children; // Allow non-authenticated users to see the landing page
+  }
+
+  if (!isSubscribed) {
+    return null; // Will redirect to subscribe page
+  }
+
+  return children;
+}
+```
+
+## Step 9: Create Subscription Page
+
+```typescript
+// client/src/pages/subscribe.tsx
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
+import { useAuth } from "@clerk/clerk-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Loader2, Camera, Zap, Shield, Download } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+
+export default function SubscribePage() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [, navigate] = useLocation();
+  const { isSignedIn } = useAuth();
+
+  useEffect(() => {
+    // Check if user is already subscribed
+    const checkSubscription = async () => {
+      try {
+        const response = await apiRequest("GET", "/api/subscription");
+        const data = await response.json();
+        setIsSubscribed(data.isSubscribed);
+        
+        if (data.isSubscribed) {
+          navigate("/"); // Redirect to home if already subscribed
+        }
+      } catch (error) {
+        console.error("Failed to check subscription:", error);
+      }
+    };
+
+    if (isSignedIn) {
+      checkSubscription();
+    }
+  }, [isSignedIn, navigate]);
+
+  const handleSubscribe = async () => {
+    if (!isSignedIn) {
+      navigate("/login?redirect=/subscribe");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const origin = window.location.origin;
+      const response = await apiRequest("POST", "/api/create-checkout-session", {
+        successUrl: `${origin}/?subscription=success`,
+        cancelUrl: `${origin}/subscribe?canceled=true`,
+      });
+      
+      const data = await response.json();
+      window.location.href = data.url;
+    } catch (error) {
+      console.error("Failed to create checkout session:", error);
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto px-4 py-16">
+      <div className="text-center space-y-6 mb-12">
+        <h1 className="text-4xl font-bold tracking-tight">
+          Subscribe to Shelfie
+        </h1>
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          Get started with Shelfie and catalog your book collection today.
+        </p>
+      </div>
+
+      <div className="max-w-md mx-auto">
+        <Card className="rounded-xl border p-8">
+          <CardHeader className="pb-4">
+            <div className="mb-8 text-center">
+              <span className="text-4xl font-bold">$20</span>
+              <span className="text-muted-foreground">/month</span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4 mb-8">
+              <div className="flex items-center gap-2">
+                <Camera className="h-5 w-5 text-primary" />
+                <span>Catalog up to 50 books per month</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-primary" />
+                <span>Lightning-fast book recognition</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                <span>Bank-level security for your library</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Download className="h-5 w-5 text-primary" />
+                <span>Download your library anytime</span>
+              </div>
+            </div>
+            
+            <Button 
+              size="lg" 
+              className="w-full" 
+              onClick={handleSubscribe} 
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Redirecting...
+                </>
+              ) : (
+                "Subscribe Now"
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+```
+
+## Step 10: Create Login Page with Redirect Support
+
+```typescript
+// client/src/pages/login.tsx
+import { useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
+import { SignIn, useAuth } from "@clerk/clerk-react";
+
+export default function LoginPage() {
+  const { isSignedIn } = useAuth();
+  const [, navigate] = useLocation();
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  const redirect = params.get("redirect") || "/";
+
+  useEffect(() => {
+    if (isSignedIn) {
+      navigate(redirect);
+    }
+  }, [isSignedIn, navigate, redirect]);
+
+  return (
+    <div className="flex justify-center items-center min-h-[80vh]">
+      <div className="w-full max-w-md">
+        <SignIn routing="path" path="/login" redirectUrl={redirect} />
+      </div>
+    </div>
+  );
+}
+```
+
+## Step 11: Update Router to Include New Pages
+
+```typescript
+// client/src/App.tsx - Update the Router component
+function Router() {
+  return (
+    <Switch>
+      {/* Public landing page */}
+      <Route path="/" component={Home} />
+
+      {/* Authentication routes */}
+      <Route path="/login" component={LoginPage} />
+      <Route path="/subscribe" component={SubscribePage} />
+
+      {/* Protected routes */}
+      <Route path="/library">
+        {() => (
+          <ProtectedRoute>
+            <SubscriptionCheck>
+              <Home />
+            </SubscriptionCheck>
+          </ProtectedRoute>
+        )}
+      </Route>
+
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+```
+
+## Step 12: Update Home Page to Handle Authentication Flow
+
+```typescript
+// client/src/pages/home.tsx - Update SignInButton onClick handling
+<SignInButton mode="modal">
+  <Button size="lg" className="text-lg px-8" onClick={() => {
+    if (isSignedIn && !isSubscribed) {
+      navigate("/subscribe");
+    }
+  }}>
+    Start Cataloging
+  </Button>
+</SignInButton>
+```
+
+## Step 13: Add Webhook Handler for Stripe Events
+
+```typescript
+// server/routes.ts - Add webhook handler for Stripe events
+app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), async (req, res) => {
+  const signature = req.headers['stripe-signature'];
+  
+  try {
+    const event = stripe.webhooks.constructEvent(
+      req.body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+    
+    // Handle subscription-related events
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const userId = session.client_reference_id;
+      
+      if (session.mode === 'subscription') {
+        // Update subscription in database
+        await db.insert(subscriptions).values({
+          userId,
+          stripeCustomerId: session.customer,
+          stripeSubscriptionId: session.subscription,
+          status: 'active'
+        });
+      }
+    } else if (event.type === 'customer.subscription.deleted') {
+      const subscription = event.data.object;
+      
+      // Update subscription status in database
+      await db
+        .update(subscriptions)
+        .set({ status: 'canceled' })
+        .where(eq(subscriptions.stripeSubscriptionId, subscription.id));
+    }
+    
+    res.json({ received: true });
+  } catch (err) {
+    console.error('Webhook Error:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+});
+```
+
+## Step 14: Update Environment Variables
+
+Add these to your `.env.development` and `.env.production` files:
+
+```
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+STRIPE_PRICE_ID=price_your_subscription_price_id
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+```
+
+## Step 15: Handle Subscription Success/Failure in UI
+
+Update the Home component to handle subscription success/failure:
+
+```typescript
+// client/src/pages/home.tsx - Add to your component
+const params = new URLSearchParams(window.location.search);
+const subscriptionStatus = params.get("subscription");
+
+useEffect(() => {
+  if (subscriptionStatus === "success") {
+    toast({
+      title: "Subscription Successful",
+      description: "Your subscription has been activated successfully.",
+    });
+    
+    // Clear URL parameters
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+}, [subscriptionStatus, toast]);
+```
+
+## How to Implement This Plan
+
+1. Start with setting up your Stripe account and products
+2. Add the subscription schema to your database
+3. Create the server-side Stripe service
+4. Implement the subscription routes and middleware
+5. Create the client-side pages and components
+6. Update your routing to include the new pages
+7. Set up Stripe webhooks for handling subscription events
+8. Test the flow end-to-end
+
+This implementation ensures that:
+1. Users are prompted to log in when they click "Start Cataloging"
+2. After login, they're directed to Stripe Checkout if not subscribed
+3. Once subscribed, they can access the full functionality of your app
+4. All protected routes check for active subscription before allowing access
+
+Remember to handle errors gracefully and provide clear feedback to users throughout the subscription process.
