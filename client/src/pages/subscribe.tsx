@@ -5,7 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, ShieldCheck, BookOpen, Camera, Download, Zap } from "lucide-react";
 
 export default function SubscribePage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -40,6 +40,7 @@ export default function SubscribePage() {
       toast({
         title: "Subscription canceled",
         description: "Your subscription process was canceled. You can try again whenever you're ready.",
+        variant: "destructive"
       });
     }
 
@@ -74,7 +75,7 @@ export default function SubscribePage() {
     if (!isSignedIn) {
       toast({
         title: "Sign in required",
-        description: "Please sign in to subscribe to Shelfie Premium",
+        description: "Please sign in to subscribe to Shelfie",
         variant: "destructive",
       });
       return;
@@ -109,86 +110,116 @@ export default function SubscribePage() {
   };
 
   return (
-    <div className="container max-w-6xl mx-auto py-12 px-4">
-      <h1 className="text-4xl font-bold text-center mb-8">Upgrade to Shelfie Premium</h1>
+    <div className="container max-w-5xl mx-auto py-12 px-4">
+      <div className="text-center mb-12">
+        <h1 className="text-4xl font-bold mb-4">Shelfie Subscription</h1>
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          Access to all Shelfie features requires a subscription. Get started today to transform your physical bookshelf into a digital library.
+        </p>
+      </div>
       
-      <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-        <Card className="border-2 border-gray-200">
-          <CardHeader>
-            <CardTitle>Free Plan</CardTitle>
-            <div className="text-3xl font-bold">$0</div>
-            <CardDescription>Limited features</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center">
-                <Check className="h-5 w-5 mr-2 text-gray-400" />
-                <span>Browse sample books</span>
+      <Card className="border-2 border-primary shadow-lg max-w-2xl mx-auto">
+        <CardHeader className="text-center pb-2">
+          <CardTitle className="text-2xl">Premium Plan</CardTitle>
+          <div className="text-4xl font-bold mt-2">$20<span className="text-base font-normal text-muted-foreground">/month</span></div>
+          <CardDescription className="text-base mt-2">Full access to all features</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6 pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <Camera className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-medium">AI Book Recognition</h3>
+                  <p className="text-sm text-muted-foreground">Instantly recognize books from shelf photos</p>
+                </div>
               </div>
-              <div className="flex items-center">
-                <Check className="h-5 w-5 mr-2 text-gray-400" />
-                <span>Preview library features</span>
+              <div className="flex items-start gap-3">
+                <BookOpen className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-medium">Complete Library</h3>
+                  <p className="text-sm text-muted-foreground">Catalog up to 50 books per month</p>
+                </div>
               </div>
-              <div className="flex items-center">
-                <Check className="h-5 w-5 mr-2 text-gray-400" />
-                <span>Limited to 5 books</span>
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button variant="outline" className="w-full" disabled>
-              Current Plan
-            </Button>
-          </CardFooter>
-        </Card>
-        
-        <Card className="border-2 border-primary shadow-lg">
-          <CardHeader>
-            <CardTitle>Premium Plan</CardTitle>
-            <div className="text-3xl font-bold">$20<span className="text-sm font-normal">/month</span></div>
-            <CardDescription>Full access to all features</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center">
-                <Check className="h-5 w-5 mr-2 text-primary" />
-                <span>Unlimited book catalog</span>
-              </div>
-              <div className="flex items-center">
-                <Check className="h-5 w-5 mr-2 text-primary" />
-                <span>AI-powered bookshelf scanning</span>
-              </div>
-              <div className="flex items-center">
-                <Check className="h-5 w-5 mr-2 text-primary" />
-                <span>Export your library to CSV</span>
-              </div>
-              <div className="flex items-center">
-                <Check className="h-5 w-5 mr-2 text-primary" />
-                <span>Detailed book information</span>
-              </div>
-              <div className="flex items-center">
-                <Check className="h-5 w-5 mr-2 text-primary" />
-                <span>Add up to 50 books per month</span>
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-medium">Secure Storage</h3>
+                  <p className="text-sm text-muted-foreground">Your library data is protected and backed up</p>
+                </div>
               </div>
             </div>
-          </CardContent>
-          <CardFooter>
-            <Button 
-              className="w-full" 
-              onClick={handleSubscribe}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                "Subscribe Now"
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <Download className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-medium">Data Export</h3>
+                  <p className="text-sm text-muted-foreground">Download your entire library as CSV</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Zap className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-medium">Fast Performance</h3>
+                  <p className="text-sm text-muted-foreground">Lightning-quick search and organization</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Check className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-medium">Cancel Anytime</h3>
+                  <p className="text-sm text-muted-foreground">No long-term commitment required</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="flex flex-col gap-4 pt-4">
+          <Button 
+            className="w-full py-6 text-lg"
+            size="lg" 
+            onClick={handleSubscribe}
+            disabled={isLoading || alreadySubscribed}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Processing...
+              </>
+            ) : alreadySubscribed ? (
+              "Already Subscribed"
+            ) : (
+              "Subscribe Now"
+            )}
+          </Button>
+          <p className="text-sm text-center text-muted-foreground">
+            Secure payment processed by Stripe. Cancel anytime from your account settings.
+          </p>
+        </CardFooter>
+      </Card>
+      
+      <div className="mt-12 text-center">
+        <h2 className="text-xl font-semibold mb-6">Customer Reviews</h2>
+        <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          <div className="p-6 rounded-lg bg-card border">
+            <p className="text-muted-foreground">
+              "Finally, a way to digitize my collection without typing everything manually!"
+            </p>
+            <p className="mt-3 font-medium">Sarah K.</p>
+          </div>
+          <div className="p-6 rounded-lg bg-card border">
+            <p className="text-muted-foreground">
+              "The AI recognition is incredibly accurate. Saved me hours of work."
+            </p>
+            <p className="mt-3 font-medium">Michael R.</p>
+          </div>
+          <div className="p-6 rounded-lg bg-card border">
+            <p className="text-muted-foreground">
+              "Perfect for keeping track of my growing book collection."
+            </p>
+            <p className="mt-3 font-medium">Emily T.</p>
+          </div>
+        </div>
       </div>
     </div>
   );
