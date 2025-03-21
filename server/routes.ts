@@ -266,6 +266,21 @@ export async function registerRoutes(app: Express) {
     }
   });
 
+  // Search books - protected
+  app.get("/api/search", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query) {
+        return res.status(400).json({ message: "Search query is required" });
+      }
+      
+      const results = await storage.searchBooks(query, req.userId as string);
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get detailed book info - protected
   app.get("/api/books/:id/details", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
