@@ -11,7 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import type { Book as BookType } from "@shared/schema";
 
 export default function LibraryPage() {
-  const [books, setBooks] = useState([]);
+  const [books, setBooks] = useState<BookType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -83,25 +83,21 @@ export default function LibraryPage() {
     }
   };
 
-  const handleUploadSuccess = (newBooks) => {
+  const handleUploadSuccess = (newBooks: BookType[]) => {
     setBooks((prevBooks) => [...newBooks, ...prevBooks]);
     setIsUploadDialogOpen(false);
   };
 
   const handleExport = async () => {
     try {
-      const response = await apiRequest("GET", "/api/export", null, {
-        responseType: "blob",
-      });
+      // First, create a URL to the export endpoint
+      const exportUrl = "/api/export";
       
-      // Create a download link
-      const url = window.URL.createObjectURL(new Blob([await response.blob()]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", "my-library.csv");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      // Use a direct window location approach for download
+      const anchor = document.createElement('a');
+      anchor.href = exportUrl;
+      anchor.download = "my-library.csv";
+      anchor.click();
     } catch (error) {
       console.error("Export failed:", error);
       toast({
