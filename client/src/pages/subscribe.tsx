@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth, SignIn } from "@clerk/clerk-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,8 +9,66 @@ import { Check, Loader2 } from "lucide-react";
 
 export default function SubscribePage() {
   const [isLoading, setIsLoading] = useState(false);
-  const { isSignedIn } = useAuth();
-  const [, navigate] = useLocation();
+  const [isCheckingSubscription, setIsCheckingSubscription] = useState(true);
+  const [alreadySubscribed, setAlreadySubscribed] = useState(false);
+  const { isSignedIn, isLoaded } = useAuth();
+  const [location, navigate] = useLocation();
+
+  // Check subscription status on load
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) {
+      setIsCheckingSubscription(false);
+      return;
+    }
+
+    // Check for query parameters
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('subscribed') === 'true') {
+      toast({
+        title: "Subscription active!",
+        description: "Your premium subscription is now active. Enjoy all features!",
+      });
+      
+      // Redirect back to library after showing the toast
+      setTimeout(() => {
+        navigate("/library");
+      }, 1500);
+      return;
+    }
+    
+    if (searchParams.get('canceled') === 'true') {
+      toast({
+        title: "Subscription canceled",
+        description: "Your subscription process was canceled. You can try again whenever you're ready.",
+      });
+    }
+
+    // Check if already subscribed
+    const checkSubscription = async () => {
+      try {
+        const response = await apiRequest("GET", "/api/subscription");
+        const data = await response.json();
+        
+        if (data.isSubscribed) {
+          setAlreadySubscribed(true);
+          toast({
+            title: "Already subscribed",
+            description: "You already have an active subscription!",
+          });
+          // Redirect to library after a short delay
+          setTimeout(() => {
+            navigate("/library");
+          }, 1500);
+        }
+      } catch (error) {
+        console.error("Failed to check subscription:", error);
+      } finally {
+        setIsCheckingSubscription(false);
+      }
+    };
+
+    checkSubscription();
+  }, [isSignedIn, isLoaded, navigate, location]);
 
   const handleSubscribe = async () => {
     if (!isSignedIn) {
@@ -25,6 +83,7 @@ export default function SubscribePage() {
     setIsLoading(true);
 
     try {
+      // Include window.location.origin to ensure proper redirect URLs
       const response = await apiRequest("POST", "/api/create-checkout-session", {
         successUrl: `${window.location.origin}/library?subscribed=true`,
         cancelUrl: `${window.location.origin}/subscribe?canceled=true`,
@@ -33,6 +92,7 @@ export default function SubscribePage() {
       const data = await response.json();
       
       if (data.url) {
+        // Use window.location.href for a full page navigation to Stripe
         window.location.href = data.url;
       } else {
         throw new Error("No checkout URL received");

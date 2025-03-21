@@ -25,7 +25,10 @@ if (missingEnvVars.length > 0) {
 
 const app = express();
 
-// Body parsing middleware
+// Special route for Stripe webhooks - needs raw body
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
+
+// Body parsing middleware for other routes
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 

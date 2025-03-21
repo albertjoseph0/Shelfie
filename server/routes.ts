@@ -64,7 +64,7 @@ export async function registerRoutes(app: Express) {
   });
   
   // Webhook endpoint for Stripe events
-  app.post("/api/webhooks/stripe", express.raw({ type: 'application/json' }), async (req, res) => {
+  app.post("/api/webhooks/stripe", async (req, res) => {
     const signature = req.headers['stripe-signature'];
     
     try {
@@ -112,13 +112,16 @@ export async function registerRoutes(app: Express) {
   // Protected routes - all API endpoints that need auth and subscription
   app.get("/api/books", requireAuth, ensureUserId, requireSubscription, async (req, res) => {
     try {
+      if (!req.userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       const books = await storage.getBooks(req.userId);
       books.sort((a, b) => {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
       res.json(books);
-    } catch (error) {
-      res.status(500).json({ message: error.message });
+    } catch (error: any) {
+      res.status(500).json({ message: error?.message || "An error occurred" });
     }
   });
 

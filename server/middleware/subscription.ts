@@ -17,8 +17,10 @@ export const requireSubscription = async (req: Request, res: Response, next: Nex
     }
     
     next();
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error checking subscription:", error);
-    res.status(500).json({ message: "Error checking subscription status" });
+    res.status(500).json({ 
+      message: error?.message || "Error checking subscription status" 
+    });
   }
 };
